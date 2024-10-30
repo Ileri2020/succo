@@ -1,1 +1,0 @@
-import{j as e}from"./main-CjZDhGab.js";const s=()=>e.jsxs("footer",{className:"w-full flex flex-col",children:[e.jsx("div",{className:"bg-accent/50 w-full h-[50px]",children:"contact"}),e.jsx("div",{className:"bg-accent/70 w-full min-h-[100px]",children:"info"})]});export{s as default};
