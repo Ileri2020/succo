@@ -7,21 +7,21 @@ const nextConfig: NextConfig = {
     root: "./",
   },
 
-  async redirects() {
-    return [
-      {
-        source: '/:path*',
-        has: [
-          {
-            type: 'host',
-            value: '.*\\.vercel\\.app',
-          },
-        ],
-        destination: 'https://www.succo.vercel.app/:path*',
-        permanent: true,
-      },
-    ]
-  },
+  // async redirects() {
+  //   return [
+  //     {
+  //       source: '/:path*',
+  //       has: [
+  //         {
+  //           type: 'host',
+  //           value: '.*\\.vercel\\.app',
+  //         },
+  //       ],
+  //       destination: 'https://www.succo.vercel.app/:path*',
+  //       permanent: true,
+  //     },
+  //   ]
+  // },
 };
 
 export default nextConfig;
