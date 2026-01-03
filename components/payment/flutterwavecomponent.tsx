@@ -30,7 +30,7 @@ export default async function FlutterwavePaymentButton({
       name,
     },
     customizations: {
-      title: 'Loyz Food and Spices',
+      title: 'Succo Stores',
       description: 'Payment for items in cart using Flutterwave',
       logo: 'https://res.cloudinary.com/dc5khnuiu/image/upload/v1765733238/j8jw0lwd79tuhofhpao9.png',
     },

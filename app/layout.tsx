@@ -38,15 +38,15 @@ interface Session {
 }
 
 const metadata: Metadata = {
-  title: "Loyz Foods and Spces",
-  description: "Your one stop store for food items",
+  title: "Succo Stores",
+  description: "Your store for your satisfaction",
 };
 
 export const SEO_CONFIG = {
   description: 'Your one stop store for food items',
-  fullName: "Lois Food and Spices",
-  name: "Lois Food and Spices",
-  slogan: "Lois Food and Spices",
+  fullName: "Succo Stores",
+  name: "Succo Stores",
+  slogan: "Succo Stores",
 };
 
 export const SYSTEM_CONFIG = {

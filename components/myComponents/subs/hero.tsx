@@ -95,7 +95,7 @@ const Hero = ({ variant = 'modern-split' }: HeroProps) => {
   const DynamicText = () => (
     <RiseAndFadeText
       texts={[
-        "From Loyz Foods and Spices", "Card & Bank Transfer Payments", "Login With Google or Facebook",
+        "From Succo Stores", "Card & Bank Transfer Payments", "Login With Google or Facebook",
         "Naturally Processed Spices", "Quality You Can Trust", "Trusted by Homes and Businesses",
         "Fast & Reliable Delivery", "Carefully Packed for Freshness", "Customer Satisfaction Guaranteed",
         "Premium Products, Fair Prices", "Authentic Nigerian Spice Blends", "Locally Sourced, Globally Delivered",
@@ -161,8 +161,8 @@ const Hero = ({ variant = 'modern-split' }: HeroProps) => {
                   <Star className="mr-1 h-3 w-3 fill-accent" /> #1 Choice for Spices
                 </div>
                 <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                  <span className="block text-foreground">Your One-Stop Shop for</span>
-                  <span className="block text-accent">Food and Spice Blends</span>
+                  <span className="block text-foreground">World of flavors</span>
+                  <span className="block text-accent">Succo</span>
                 </h1>
                 <DynamicText />
                 <p className="max-w-[600px] text-lg text-muted-foreground md:text-xl leading-relaxed">
@@ -197,7 +197,7 @@ const Hero = ({ variant = 'modern-split' }: HeroProps) => {
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="backdrop-blur-md bg-black/30 p-8 md:p-10 rounded-2xl border border-white/10 shadow-2xl">
               <div className="flex z-50 md:hidden w-full justify-center items-center mb-6"><SearchInput /></div>
               <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight mb-4 drop-shadow-md">
-                Your One-Stop Shop for <br /><span className="text-accent">Food and Spice Blends</span>
+                Indulge in a world of flavors <br /><span className="text-accent">Succo</span>
               </h1>
               <div className="text-gray-200 mb-8"><DynamicText /></div>
               <CTAButtons />

@@ -17,7 +17,7 @@ const nextConfig: NextConfig = {
             value: '.*\\.vercel\\.app',
           },
         ],
-        destination: 'https://www.loyzfoodsandspices.com/:path*',
+        destination: 'https://www.succo.vercel.app/:path*',
         permanent: true,
       },
     ]

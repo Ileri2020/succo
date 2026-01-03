@@ -11,12 +11,12 @@ export default {
         {
             icon: <FaEnvelope/>, // className="w-[40px] h-[40px] text-accent hover:bg-accent hover:text-slate-100 rounded-md bg-transparent border-accent border-2 p-1"
             text: "Email",
-            value: "loyzspices@gmail.com"
+            value: "succostores@gmail.com"
         },
         {
             icon : <MdOutlineMessage />, //className="w-[40px] h-[40px] text-accent hover:bg-accent hover:text-slate-100 rounded-md bg-transparent border-accent border-2 p-1"
             text : "Chat to us",
-            value : "https://www.loyzfoodsandspices.com/contact"
+            value : "https://www.succo.vercel.app/contact"
         },
         {
             icon : <MdOutlinePhone/>,
