@@ -23,10 +23,11 @@ export default {Links : [
     //   name: <IoMdHelp />,
     //   path: "/help",
     // },
-    // {
-    //   name: <IoFastFoodOutline />,
-    //   path: "/lunch",
-    // },
+    {
+      icon: <IoFastFoodOutline />,
+      path: "/lunch",
+      name: "Lunch",
+    },
     {
       icon: <AiOutlineHistory />,
       path: "/about",

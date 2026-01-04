@@ -1,6 +1,8 @@
 "use client"
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils"
 import { Button } from '@/components/ui/button'
 import {
   ArrowRight, Clock, Truck, Star, ShieldCheck, CreditCard, ShoppingCart,
@@ -18,6 +20,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Input } from '@/components/ui/input'
+import { ProductCarousel } from './ProductCarousel'
 
 type HeroVariant = 'modern-split' | 'immersive' | 'carousel' | 'story' | 'menu' | 'experience' | 'local';
 
@@ -158,17 +161,18 @@ const Hero = ({ variant = 'modern-split' }: HeroProps) => {
               <div className="flex z-50 md:hidden w-full justify-center items-center"><SearchInput /></div>
               <div className="space-y-4">
                 <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-accent/10 text-accent hover:bg-accent/20">
-                  <Star className="mr-1 h-3 w-3 fill-accent" /> #1 Choice for Spices
+                  <Star className="mr-1 h-3 w-3 fill-accent" /> #1 Choice
                 </div>
                 <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
-                  <span className="block text-foreground">World of flavors</span>
+                  <span className="block text-foreground">World of flavors! 🍴</span>
                   <span className="block text-accent">Succo</span>
                 </h1>
-                <DynamicText />
-                <p className="max-w-[600px] text-lg text-muted-foreground md:text-xl leading-relaxed">
+                 <DynamicText />
+                 <p className="max-w-[600px] text-lg text-muted-foreground md:text-xl leading-relaxed">
                   Discover premium products at competitive prices, with fast shipping and exceptional customer service.
                 </p>
               </div>
+              <ProductCarousel />
               <CTAButtons />
               <TrustBadges />
             </motion.div>
@@ -197,7 +201,7 @@ const Hero = ({ variant = 'modern-split' }: HeroProps) => {
             <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="backdrop-blur-md bg-black/30 p-8 md:p-10 rounded-2xl border border-white/10 shadow-2xl">
               <div className="flex z-50 md:hidden w-full justify-center items-center mb-6"><SearchInput /></div>
               <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight mb-4 drop-shadow-md">
-                Indulge in a world of flavors <br /><span className="text-accent">Succo</span>
+                Indulge in a world of flavors! 🍴 <br /><span className="text-accent">Succo</span>
               </h1>
               <div className="text-gray-200 mb-8"><DynamicText /></div>
               <CTAButtons />

@@ -9,7 +9,7 @@ const prisma = new PrismaClient();
 export async function getUserLunches() {
   const session = await auth();
   if (!session?.user?.id) {
-    return [];
+    return { templates: [], schedules: [] };
   }
 
   const userId = session.user.id;
@@ -31,10 +31,23 @@ export async function getUserLunches() {
         updatedAt: 'desc'
       }
     });
-    return lunches;
+
+    // Also fetch active subscriptions/schedules
+    const schedules = await prisma.lunch.findMany({
+        where: { userId },
+        include: {
+            carts: {
+                include: {
+                    products: { include: { product: true } }
+                }
+            }
+        }
+    });
+
+    return { templates: lunches, schedules };
   } catch (error) {
     console.error("Error fetching lunches:", error);
-    return [];
+    return { templates: [], schedules: [] };
   }
 }
 
@@ -207,4 +220,130 @@ export async function addLunchToCart(lunchId: string) {
         console.error("Error moving lunch to cart", error);
         return { success: false, error: "Failed to move to cart" };
     }
+}
+
+export async function scheduleLunch(data: {
+    templateId: string;
+    name: string;
+    frequency: string;
+    daysOfWeek: string[];
+    timesInDay: string[];
+    startDate: Date;
+    endDate: Date;
+    deliveryFeeTotal: number;
+}) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+
+    try {
+        const template = await prisma.cart.findUnique({
+            where: { id: data.templateId },
+            include: { products: { include: { product: true } } }
+        });
+
+        if (!template) throw new Error("Template not found");
+
+        const scheduledDates = getScheduledDates(
+            data.frequency,
+            new Date(data.startDate),
+            new Date(data.endDate),
+            data.daysOfWeek,
+            data.timesInDay
+        );
+
+        if (scheduledDates.length === 0) {
+            return { success: false, error: "No delivery dates found for this schedule" };
+        }
+
+        const lunchRecord = await prisma.lunch.create({
+            data: {
+                userId,
+                name: data.name,
+                frequency: data.frequency,
+                daysOfWeek: data.daysOfWeek,
+                timesInDay: data.timesInDay,
+                startDate: data.startDate,
+                endDate: data.endDate,
+                status: "active"
+            }
+        });
+
+        const deliveryFeePerCart = data.deliveryFeeTotal / scheduledDates.length;
+        const subtotalPerCart = template.products.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+        const totalPerCart = subtotalPerCart + deliveryFeePerCart;
+
+        // Create carts for each date
+        for (const date of scheduledDates) {
+            await prisma.cart.create({
+                data: {
+                    userId,
+                    lunchId: lunchRecord.id,
+                    type: "cart",
+                    status: "unconfirmed", // Requires payment
+                    total: totalPerCart,
+                    deliveryFee: deliveryFeePerCart,
+                    deliveryDate: date,
+                    name: `${data.name} - ${date.toLocaleDateString()}`,
+                    products: {
+                        create: template.products.map(p => ({
+                            productId: p.productId,
+                            quantity: p.quantity
+                        }))
+                    }
+                }
+            });
+        }
+
+        revalidatePath("/lunch");
+        return { success: true, lunchId: lunchRecord.id };
+    } catch (error) {
+        console.error("Error scheduling lunch:", error);
+        return { success: false, error: "Failed to schedule lunch" };
+    }
+}
+
+function getScheduledDates(frequency: string, startDate: Date, endDate: Date, daysOfWeeks: string[], timesInDay: string[]) {
+    const dates: Date[] = [];
+    let current = new Date(startDate);
+    const end = new Date(endDate);
+    
+    // Safety break
+    let count = 0;
+
+    while (current <= end && count < 1000) {
+        count++;
+        let match = false;
+        if (frequency === 'daily') {
+            match = true;
+        } else if (frequency === 'weekly') {
+            const dayName = current.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+            // normalized check
+            if (daysOfWeeks.some(d => d.toLowerCase() === dayName)) {
+                match = true;
+            }
+        } else if (frequency === 'monthly') {
+            if (current.getDate() === startDate.getDate()) {
+                match = true;
+            }
+        } else if (frequency === 'once') {
+            match = current.toDateString() === startDate.toDateString();
+        }
+
+        if (match) {
+            for (const time of timesInDay) {
+                const [hours, minutes] = time.split(':').map(Number);
+                const d = new Date(current);
+                d.setHours(hours || 12, minutes || 0, 0, 0);
+                if (d >= startDate && d <= end) {
+                    dates.push(d);
+                }
+            }
+        }
+        
+        if (frequency === 'once') break;
+
+        current.setDate(current.getDate() + 1);
+    }
+    return dates;
 }

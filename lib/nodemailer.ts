@@ -14,15 +14,21 @@ const transporter = nodemailer.createTransport({
 export const sendOrderNotification = async (to: string, orderDetails: any) => {
     try {
         console.log('Sending order notification email to:', to);
+        const isUnconfirmed = orderDetails.status === 'unconfirmed';
+        const subject = isUnconfirmed ? 'Action Required: Confirm Bank Transfer' : 'New Order Notification';
+        
         const mailOptions = {
             from: email,
             to,
-            subject: 'New Order Notification',
+            subject,
             html: `
-        <h1>New Order Received</h1>
-        <p>A new order has been placed successfully.</p>
+        <h1>${subject}</h1>
+        <p>${isUnconfirmed ? 'A user has submitted a bank transfer for confirmation.' : 'A new order has been placed.'}</p>
         <p><strong>Transaction Reference:</strong> ${orderDetails.tx_ref}</p>
-        <p><strong>Amount:</strong> ₦${orderDetails.amount}</p>
+        <p><strong>Amount:</strong> ₦${orderDetails.amount.toLocaleString()}</p>
+        <p><strong>Payment Method:</strong> ${orderDetails.method || 'Card'}</p>
+        ${orderDetails.payeeName ? `<p><strong>Payee Name:</strong> ${orderDetails.payeeName}</p>` : ''}
+        ${orderDetails.receiptUrl ? `<p><strong>Receipt:</strong> <a href="${orderDetails.receiptUrl}">Click here to view</a></p>` : ''}
         <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
       `,
         };

@@ -34,6 +34,7 @@ model User {
   updatedAt     DateTime          @updatedAt
   wishlist      Wishlist[]
   messages      Message[]
+  lunches       Lunch[]
 }
 
 model Account {
@@ -184,20 +185,23 @@ model Stock {
 }
 
 model Cart {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId      String     @db.ObjectId
-  name        String? // User given name for the cart
-  contact     String? // Contact assigned to the cart
-  products    CartItem[]
-  total       Float
-  deliveryFee Float      @default(0)
-  payment     Payment?
-  status      String     @default("pending")
-  refund      Refund?
-  type        String     @default("cart") // cart, lunch
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String     @db.ObjectId
+  name         String? // User given name for the cart
+  contact      String? // Contact assigned to the cart
+  products     CartItem[]
+  total        Float
+  deliveryFee  Float      @default(0)
+  payment      Payment?
+  status       String     @default("pending")
+  refund       Refund?
+  type         String     @default("cart") // cart, lunch
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deliveryDate DateTime?
+  lunchId      String?    @db.ObjectId
+  lunch        Lunch?     @relation(fields: [lunchId], references: [id], onDelete: SetNull)
 }
 
 model CartItem {
@@ -318,6 +322,22 @@ model Review {
   comment    String?
   isArchived Boolean  @default(false)
   reply      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Lunch {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String?
+  frequency  String   @default("once") // once, daily, weekly, monthly
+  daysOfWeek String[] // ["monday", "wednesday"]
+  timesInDay String[] // ["12:00", "15:00"]
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("active") // active, completed, cancelled
+  carts      Cart[]
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 }

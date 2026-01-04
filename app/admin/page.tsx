@@ -26,6 +26,21 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 
+function getWeekNumber(d: Date) {
+  d = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  var yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  var weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return weekNo;
+}
+
+function getFirstDayOfWeek(d: Date) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+  return new Date(date.setDate(diff));
+}
+
 /* ================= FORMS ================= */
 
 const allForms = [
@@ -140,10 +155,11 @@ const Admin = () => {
 
   const cartColumns = useMemo(
     () => [
-      { accessorKey: "name", header: "Name" }, // Added Name
+      { accessorKey: "name", header: "Name/Week" },
       { accessorKey: "userName", header: "User" },
       { accessorKey: "total", header: "Total" },
       { accessorKey: "status", header: "Status" },
+      { accessorKey: "deliveryDate", header: "Delivery Time" },
       { accessorKey: "createdAt", header: "Created At" },
     ],
     []
@@ -177,16 +193,47 @@ const Admin = () => {
         let carts = await cartsRes.json();
         if (!Array.isArray(carts)) carts = [];
 
-        setCartData(
-          carts.map((c: any) => ({
-            id: c.id,
-            name: c.name || "N/A", // Map name
-            userName: c.user?.name || "Unknown",
-            total: c.total,
-            status: c.status,
-            createdAt: new Date(c.createdAt).toLocaleString(),
-          }))
-        );
+        // Sorting by deliveryDate
+        carts.sort((a: any, b: any) => {
+            const dateA = new Date(a.deliveryDate || a.createdAt).getTime();
+            const dateB = new Date(b.deliveryDate || b.createdAt).getTime();
+            return dateA - dateB;
+        });
+
+        // Grouping and adding separators
+        const finalCarts: any[] = [];
+        let currentWeek: number | null = null;
+
+        carts.forEach((c: any) => {
+            const deliveryDate = new Date(c.deliveryDate || c.createdAt);
+            const weekNum = getWeekNumber(deliveryDate);
+            
+            if (currentWeek !== weekNum) {
+                currentWeek = weekNum;
+                const firstDay = getFirstDayOfWeek(new Date(deliveryDate));
+                finalCarts.push({
+                    id: `week-${weekNum}`,
+                    name: `WEEK ${weekNum} - Starts ${firstDay.toLocaleDateString()}`,
+                    userName: "",
+                    total: "",
+                    status: "separator",
+                    deliveryDate: "",
+                    createdAt: ""
+                });
+            }
+
+            finalCarts.push({
+                id: c.id,
+                name: c.name || "N/A",
+                userName: c.user?.name || "Unknown",
+                total: c.total,
+                status: c.status,
+                deliveryDate: deliveryDate.toLocaleString(),
+                createdAt: new Date(c.createdAt).toLocaleString(),
+            });
+        });
+
+        setCartData(finalCarts);
 
         /* ===== NOTIFICATIONS ===== */
         // ... notifications fetch unchanged

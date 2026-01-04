@@ -267,7 +267,8 @@ export function DataTableDemo(props: { data: any, columns: any, onRowClick?: (ro
                 const status = (row.original as any).status;
                 let rowClass = "cursor-pointer transition-colors hover:bg-muted/50 ";
 
-                if (status === "pending") rowClass += "bg-yellow-100/50 dark:bg-yellow-900/20 hover:bg-yellow-200/50 dark:hover:bg-yellow-900/30";
+                if (status === "separator") rowClass = "bg-primary/20 font-bold h-12 pointer-events-none sticky top-0 z-10";
+                else if (status === "pending") rowClass += "bg-yellow-100/50 dark:bg-yellow-900/20 hover:bg-yellow-200/50 dark:hover:bg-yellow-900/30";
                 else if (status === "paid" || status === "completed") rowClass += "bg-green-100/50 dark:bg-green-900/20 hover:bg-green-200/50 dark:hover:bg-green-900/30";
                 else if (status === "unconfirmed") rowClass += "bg-orange-100/50 dark:bg-orange-900/20 hover:bg-orange-200/50 dark:hover:bg-orange-900/30";
 

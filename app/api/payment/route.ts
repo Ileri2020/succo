@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
           total,
           deliveryFee: Number(deliveryFee),
           status: "pending",
+          deliveryDate: new Date(),
           products: { create: items.map((i: any) => ({ productId: i.productId, quantity: i.quantity })) },
         },
       });

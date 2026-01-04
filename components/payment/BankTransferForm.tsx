@@ -101,12 +101,14 @@ export function BankTransferForm({ amount, cartId, onSuccess }: BankTransferForm
                 try {
                     try {
                         await axios.post("/api/send-notification", {
-                            // email: process.env.NEXT_PUBLIC_ORDER_RECEIVER_EMAIL,
-                            orderDetails: { tx_ref: 'bank_transfer', amount },
-                        });
-                        await axios.post("/api/send-notification", {
-                            // email: 'adepojuololade2020@gmail.com',
-                            orderDetails: { tx_ref: 'bank_transfer', amount },
+                            orderDetails: { 
+                                tx_ref: `BT-${cartId}`, 
+                                amount, 
+                                status: 'unconfirmed',
+                                method: 'bank_transfer',
+                                payeeName,
+                                receiptUrl
+                            },
                         });
                     } catch (emailError) {
                         console.warn("Failed to send email notifications:", emailError);

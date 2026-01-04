@@ -37,7 +37,7 @@ export function AddLunchDialog({ isOpen, onClose, productId }: AddLunchDialogPro
     setLoading(true)
     try {
       const data = await getUserLunches()
-      setLunches(data)
+      setLunches(data.templates || [])
     } catch (error) {
       console.error("Failed to fetch lunches", error)
       toast.error("Failed to load your lunch lists")
