@@ -4,10 +4,8 @@ import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 import FacebookProvider from "next-auth/providers/facebook";
 import bcrypt from "bcryptjs";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { PrismaAdapter } from '@auth/prisma-adapter';
-
-const prisma = new PrismaClient();
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   trustHost: true,
@@ -34,7 +32,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           }
         });
 
-        if (!user || !user.password) throw new Error("Invalid email/contact or password");
+        if (!user) throw new Error("Invalid email/contact or password");
+        
+        // Differentiate OAuth users who haven't set a password
+        if (!user.password) {
+          throw new Error("SocialLoginOnly");
+        }
 
         const isMatched = await bcrypt.compare(password, user.password);
         if (!isMatched) throw new Error("Invalid email/contact or password");
@@ -62,7 +65,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
   callbacks: {
     // Persist all user info in the JWT token
-    async jwt({ token, user }) {
+    async jwt({ token, user, account }) {
       if (user) {
         token.id = user.id;
         token.name = user.name ?? null;
@@ -71,39 +74,42 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.role = user.role ?? null;
         token.image = user.image ?? null;
         token.providerid = user.providerid ?? null;
-        token.addresses = await prisma.shippingAddress.findMany({
-          where: { userId: user.id },
-        });
       }
       return token;
     },
 
     // Make the token info available in the session object
     async session({ session, token }) {
-      session.user.id = token.id!;
-      session.user.name = token.name ?? null;
-      session.user.email = token.email ?? null;
-      session.user.contact = token.contact ?? null;
-      session.user.role = token.role ?? null;
-      session.user.image = token.image ?? null;
-      session.user.providerid = token.providerid ?? null;
-      session.user.addresses = await prisma.shippingAddress.findMany({
-        where: { userId: token.id },
-      });
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.name = token.name as string ?? null;
+        session.user.email = token.email as string ?? null;
+        session.user.contact = token.contact as string ?? null;
+        session.user.role = token.role as string ?? null;
+        session.user.image = token.image as string ?? null;
+        session.user.providerid = token.providerid as string ?? null;
+        
+        // Fetch addresses here instead of storing in JWT
+        session.user.addresses = await prisma.shippingAddress.findMany({
+          where: { userId: token.id as string },
+        });
+      }
       return session;
     },
   },
 
   session: {
     strategy: "jwt",
-    maxAge: 10 * 60 * 60, // 10 hours
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
   },
 
   jwt: {
-    maxAge: 10 * 60 * 60, // 10 hours
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
 
-  debug: false,
+  secret: process.env.AUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
 });
 
 export const runtime = "nodejs";

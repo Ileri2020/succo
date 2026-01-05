@@ -1,62 +1,57 @@
 //  @ts-nocheck
 "use server";
 
-// import connectDB from "@/lib/db";
-// import { User } from "@/models/User";
 import { redirect } from "next/navigation";
-import { CredentialsSignin } from "next-auth";
 import { signIn } from "@/auth";
-import { compare, hash } from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
-// import { compareSync, hashSync } from "bcryptjs";
-const prisma = new PrismaClient();
+import { compare, hash } from 'bcryptjs';
+import { prisma } from '@/lib/prisma';
+import { isRedirectError } from "next/dist/client/components/redirect";
 
 const login = async (formData: FormData) => {
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
+  if (!email || !password) {
+    return "Please provide both email and password";
+  }
+
   try {
     await signIn("credentials", {
-      redirect: false,
-      callbackUrl: "/",
       email,
       password,
+      redirectTo: "/",
     });
   } catch (error) {
-    const someError = error as CredentialsSignin;
-    return someError.cause;
+    if (isRedirectError(error)) {
+      throw error;
+    }
+    console.error("Login error:", error);
+    return "Invalid credentials";
   }
-  redirect("/");
 };
 
 const register = async (formData: FormData) => {
   const username = formData.get("username") as string;
-  // const lastName = formData.get("lastname") as string;
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
-  if ( !username || !email || !password) {
+  if (!username || !email || !password) {
     throw new Error("Please fill all fields");
   }
-
-  // await connectDB();
 
   // existing user
   const existingUser = await prisma.user.findUnique({
     where: { email },
-    // select: { password: true, role: true },
   });
   if (existingUser) throw new Error("User already exists");
 
-  const hashedPassword = await hash(password, parseInt(process.env.SALT_ROUNDS));
+  const saltRounds = parseInt(process.env.SALT_ROUNDS || "10");
+  const hashedPassword = await hash(password, saltRounds);
 
-  // await User.create({ firstName, lastName, email, password: hashedPassword });
   await prisma.user.create({
     data: {
       email,
       username,
-      // image : image,
-      // authProviderId: id,
       password: hashedPassword,
     },
   });
@@ -64,10 +59,5 @@ const register = async (formData: FormData) => {
   redirect("/login");
 };
 
-// const fetchAllUsers = async () => {
-//   await connectDB();
-//   const users = await User.find({});
-//   return users;
-// };
-
 export { register, login };
+
