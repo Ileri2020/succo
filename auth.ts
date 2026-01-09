@@ -93,6 +93,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.addresses = await prisma.shippingAddress.findMany({
           where: { userId: token.id as string },
         });
+        session.user.shippingAddress = session.user.addresses[0] || null;
       }
       return session;
     },
