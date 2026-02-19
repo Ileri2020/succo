@@ -1,725 +1,7 @@
 ================================================================================
-SUCCO PROJECT - SOURCE CODE CONSOLIDATION
-Generated: 2026-01-30 11:37:43
+LOIS SPICE PROJECT - SOURCE CODE CONSOLIDATION
+Generated: 2026-02-19 12:37:27
 ================================================================================
-
-
-================================================================================
-LOCATION: auth.ts
-================================================================================
-
-// @ts-nocheck
-import NextAuth from "next-auth";
-import Credentials from "next-auth/providers/credentials";
-import Google from "next-auth/providers/google";
-import FacebookProvider from "next-auth/providers/facebook";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
-import { PrismaAdapter } from '@auth/prisma-adapter';
-
-export const { handlers, signIn, signOut, auth } = NextAuth({
-  trustHost: true,
-  adapter: PrismaAdapter(prisma),
-  providers: [
-    Credentials({
-      name: "Credentials",
-      credentials: {
-        email: { label: "Email/Contact", type: "text" },
-        password: { label: "Password", type: "password" },
-      },
-      authorize: async (credentials) => {
-        const identifier = credentials?.email; // This will hold either email or contact
-        const password = credentials?.password;
-        if (!identifier || !password) throw new Error("Please provide email/contact & password");
-
-        // Try finding by email first, then by contact
-        const user = await prisma.user.findFirst({
-          where: {
-            OR: [
-              { email: identifier },
-              { contact: identifier }
-            ]
-          }
-        });
-
-        if (!user) throw new Error("Invalid email/contact or password");
-        
-        // Differentiate OAuth users who haven't set a password
-        if (!user.password) {
-          throw new Error("SocialLoginOnly");
-        }
-
-        const isMatched = await bcrypt.compare(password, user.password);
-        if (!isMatched) throw new Error("Invalid email/contact or password");
-
-        return {
-          id: user.id,
-          name: user.name,
-          email: user.email,
-          contact: user.contact,
-          role: user.role,
-          image: user.image,
-          providerid: user.providerid,
-        };
-      },
-    }),
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-    }),
-    FacebookProvider({
-      clientId: process.env.FACEBOOK_CLIENT_ID,
-      clientSecret: process.env.FACEBOOK_CLIENT_SECRET
-    }),
-  ],
-
-  callbacks: {
-    // Persist all user info in the JWT token
-    async jwt({ token, user, account }) {
-      if (user) {
-        token.id = user.id;
-        token.name = user.name ?? null;
-        token.email = user.email ?? null;
-        token.contact = user.contact ?? null;
-        token.role = user.role ?? null;
-        token.image = user.image ?? null;
-        token.providerid = user.providerid ?? null;
-      }
-      return token;
-    },
-
-    // Make the token info available in the session object
-    async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string;
-        session.user.name = token.name as string ?? null;
-        session.user.email = token.email as string ?? null;
-        session.user.contact = token.contact as string ?? null;
-        session.user.role = token.role as string ?? null;
-        session.user.image = token.image as string ?? null;
-        session.user.providerid = token.providerid as string ?? null;
-        
-        // Fetch addresses here instead of storing in JWT
-        session.user.addresses = await prisma.shippingAddress.findMany({
-          where: { userId: token.id as string },
-        });
-        session.user.shippingAddress = session.user.addresses[0] || null;
-      }
-      return session;
-    },
-  },
-
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // 24 hours
-  },
-
-  jwt: {
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-  },
-
-  secret: process.env.AUTH_SECRET,
-  debug: process.env.NODE_ENV === "development",
-});
-
-export const runtime = "nodejs";
-
-
-
-================================================================================
-LOCATION: middleware.ts
-================================================================================
-
-export { auth as middleware } from "@/auth";
-
-export const runtime = "nodejs";
-
-
-================================================================================
-LOCATION: next.config.ts
-================================================================================
-
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
-  reactStrictMode: false,
-
-  turbopack: {
-    root: "./",
-  },
-
-  // async redirects() {
-  //   return [
-  //     {
-  //       source: '/:path*',
-  //       has: [
-  //         {
-  //           type: 'host',
-  //           value: '.*\\.vercel\\.app',
-  //         },
-  //       ],
-  //       destination: 'https://www.succo.vercel.app/:path*',
-  //       permanent: true,
-  //     },
-  //   ]
-  // },
-};
-
-export default nextConfig;
-
-
-
-================================================================================
-LOCATION: session.ts
-================================================================================
-
-'use server'
-import { auth } from "./auth";
-import type { Session } from "next-auth";
-
-
-export const usersession = async () => {
-    const session = await auth();
-    // console.log("session from login component",session)
-    if (session?.user) {
-      return session;
-    }
-  }
-
-
-
-
-//   session from login component {
-//   user: {
-//     name: 'Adepoju Ololade',
-//     email: 'adepojuololade2020@gmail.com',
-//     image: 'https://lh3.googleusercontent.com/a/ACg8ocLdrFmljf-SPXpYAl7HcdIPIVgBam0jRZ5YkySzCZW8zI7oIik2=s96-c'
-//   },
-//   expires: '2025-12-06T18:59:49.210Z'
-// }
-
-
-================================================================================
-LOCATION: tailwind.config.ts
-================================================================================
-
-import type { Config } from "tailwindcss";
-
-const config: Config = {
-    darkMode: ["class"],
-    content: [
-    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
-    "./components/**/*.{js,ts,jsx,tsx,mdx}",
-    "./app/**/*.{js,ts,jsx,tsx,mdx}",
-  ],
-  theme: {
-  	container: {
-  		center: true,
-  		padding: '2rem',
-  		screens: {
-  			'2xl': '1400px'
-  		}
-  	},
-  	screens: {
-  		sm: '640px',
-  		md: '768px',
-  		lg: '960px',
-  		xl: '1240px'
-  	},
-  	extend: {
-  		colors: {
-  			background: 'hsl(var(--background))',
-  			foreground: 'hsl(var(--foreground))',
-  			card: {
-  				DEFAULT: 'hsl(var(--card))',
-  				foreground: 'hsl(var(--card-foreground))'
-  			},
-  			popover: {
-  				DEFAULT: 'hsl(var(--popover))',
-  				foreground: 'hsl(var(--popover-foreground))'
-  			},
-  			primary: {
-  				DEFAULT: 'hsl(var(--primary))',
-  				foreground: 'hsl(var(--primary-foreground))'
-  			},
-  			secondary: {
-  				DEFAULT: 'hsl(var(--secondary))',
-  				foreground: 'hsl(var(--secondary-foreground))'
-  			},
-  			muted: {
-  				DEFAULT: 'hsl(var(--muted))',
-  				foreground: 'hsl(var(--muted-foreground))'
-  			},
-  			accent: {
-  				DEFAULT: 'hsl(var(--accent))',
-  				foreground: 'hsl(var(--accent-foreground))',
-  				secondary: 'hsl(var(--accent-secondary))'
-  			},
-  			destructive: {
-  				DEFAULT: 'hsl(var(--destructive))',
-  				foreground: 'hsl(var(--destructive-foreground))'
-  			},
-  			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
-  			ring: 'hsl(var(--ring))',
-  			chart: {
-  				'1': 'hsl(var(--chart-1))',
-  				'2': 'hsl(var(--chart-2))',
-  				'3': 'hsl(var(--chart-3))',
-  				'4': 'hsl(var(--chart-4))',
-  				'5': 'hsl(var(--chart-5))'
-  			},
-  			sidebar: {
-  				DEFAULT: 'hsl(var(--sidebar-background))',
-  				foreground: 'hsl(var(--sidebar-foreground))',
-  				primary: 'hsl(var(--sidebar-primary))',
-  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
-  				accent: 'hsl(var(--sidebar-accent))',
-  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
-  				border: 'hsl(var(--sidebar-border))',
-  				ring: 'hsl(var(--sidebar-ring))'
-  			}
-  		},
-  		fontFamily: {
-  			'dance': [
-  				'dance'
-  			],
-  			'roboto_mono': [
-  				'roboto_mono'
-  			],
-  			'roboto': [
-  				'roboto'
-  			]
-  		},
-  		borderRadius: {
-  			lg: 'var(--radius)',
-  			md: 'calc(var(--radius) - 2px)',
-  			sm: 'calc(var(--radius) - 4px)'
-  		},
-  		keyframes: {
-  			'accordion-down': {
-  				from: {
-  					height: '0'
-  				},
-  				to: {
-  					height: 'var(--radix-accordion-content-height)'
-  				}
-  			},
-  			'accordion-up': {
-  				from: {
-  					height: 'var(--radix-accordion-content-height)'
-  				},
-  				to: {
-  					height: '0'
-  				}
-  			}
-  		},
-  		animation: {
-  			'accordion-down': 'accordion-down 0.2s ease-out',
-  			'accordion-up': 'accordion-up 0.2s ease-out'
-  		}
-  	}
-  },
-  plugins: [require("tailwindcss-animate")],
-};
-export default config;
-
-
-
-================================================================================
-LOCATION: textctrl.tsx
-================================================================================
-
-
-import { motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
-
-export const TextAnimations = () => {
-  const texts = ['TextAnimations', 'Text 2', 'TextAnimations', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-        initial={{ opacity: 0 }}
-        animate={{
-          opacity: 1,
-          transition: {
-            duration: 2.0,
-            delay: 0.5,
-            /*repeat: Infinity,*/
-          },
-        }}
-        className="text-lg font-bold text-gray-800"
-      >
-        {texts[currentIndex]}
-      </motion.div>
-    )
-  }
-  
-
-  return (
-    <div className="container mx-auto p-4">
-        <Temp />
-    </div>
-  );
-};
-
-
-
-export const SlideInText = () => {
-  const texts = ['SlideInText', 'Text 2', 'SlideInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ x: '-100%' }}
-          animate={{
-            x: '0%',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-  
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const ScaleInText = () => {
-  const texts = ['ScaleInText', 'Text 2', 'ScaleInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{
-            scale: 1,
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const RotateInText = () => {
-  const texts = ['RotateInText', 'Text 2', 'RotateInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ rotate: '0deg' }}
-          animate={{
-            rotate: '360deg',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const FlyInText = () => {
-  const texts = ['FlyInText', 'Text 2', 'FlyInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ x: '-100%' }}
-          animate={{
-            x: '0%',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-export const TypewriterText = () => {
-  const texts = ['TypewriterText', 'Text 2', 'TypewriterText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ width: '0%' }}
-          animate={{
-            width: '100%',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const SlideUpText = () => {
-  const texts = ['SlideUpText', 'Text 2', 'SlideUpText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{
-            y: '0%',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const BounceInText = () => {
-  const texts = ['BounceInText', 'Text 2', 'BounceInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{
-            scale: 1,
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const ZoomInText = () => {
-  const texts = ['ZoomInText', 'Text 2', 'ZoomInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{
-            scale: 1,
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-export const FlipInText = () => {
-  const texts = ['FlipInText', 'Text 2', 'FlipInText', 'Text 4'];
-  const [currentIndex, setCurrentIndex] = useState(0);
-
-  useEffect(()=>{
-    const interval = setInterval(()=>{
-        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
-    },6000)
-    return()=>clearInterval(interval)
-  },[currentIndex])
-
-  const Temp = () => {
-    return (
-        <motion.div
-          initial={{ rotateY: '180deg' }}
-          animate={{
-            rotateY: '0deg',
-            transition: {
-              duration: 4.0,
-              delay: 0.5,
-            },
-          }}
-          className="text-lg font-bold text-gray-800"
-        >
-          {texts[currentIndex]}
-        </motion.div>
-    )
-  }
-
-  return (
-    <div className="container mx-auto p-4">
-      <Temp />
-    </div>
-  );
-};
-
-
-
-
-
 
 
 ================================================================================
@@ -1217,383 +499,6 @@ export async function checkWishlisStatus(productId: string) {
 
 
 ================================================================================
-LOCATION: app\globals.css
-================================================================================
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 30 98% 50%;
-    --accent-secondary: 107 77% 50%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-    --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 30 98% 50%;
-    --accent-secondary: 107 77% 76%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
-  }
-}
-
-
-
-@font-face {
-  font-family: dance;
-  src: url("./fonts/dancing/DancingScript-Regular.woff2") format("woff2");
-  font-weight: normal;
-  font-style: normal;
-}
-@font-face {
-  font-family: roboto_mono;
-  src: url("./fonts/Roboto_Mono/static/AnyConv.com__RobotoMono-Medium.woff2") format("woff2");
-  font-weight: normal;
-  font-style: normal;
-}
-@font-face {
-  font-family: roboto;
-  src: url("./fonts/Roboto/AnyConv.com__Roboto-Regular.woff2") format("woff2");
-  font-weight: normal;
-  font-style: normal;
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-}
-
-.text-outline {
-  -webkit-text-stroke: 1px hsl(var(--accent));
-}
-
-.text-outline-positive {
-  -webkit-text-stroke: 1px hsl(var(--accent-secondary));
-}
-
-.text-outline-none {
-  -webkit-text-stroke: 0px hsl(var(--accent));
-}
-
-
-.bg-blur{
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
-}
-
-.glass{
-  background: rgba(255, 255, 255, 0.31);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(5px);
-  -webkit-backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-.glass-outline{
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(8.6px);
-  -webkit-backdrop-filter: blur(8.6px);
-  border: 1px solid rgba(255, 255, 255, 1);
-}
-
-.glass-green{
-  background: rgba(0, 255, 80, 0.1);
-  border-radius: 16px;
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
-  backdrop-filter: blur(11.4px);
-  -webkit-backdrop-filter: blur(11.4px);
-  border: 1px solid rgba(0, 255, 80, 0.4);
-}
-
-.glow-green{
-  -webkit-box-shadow:0px 0px 72px 22px rgba(45,255,196,0.55);
-  -moz-box-shadow: 0px 0px 72px 22px rgba(45,255,196,0.55);
-  box-shadow: 0px 0px 72px 22px rgba(45,255,196,0.55);
-}
-
-.glow-text{
-  text-shadow: rgba(255,162,0,0.77) 0px 0px 39px;
-}
-
-.gradient-text{
-  background: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)));
-  /*font-family: Poppins;*/
-  /*text-transform: uppercase;*/
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.animated-bg-gradient{
-  background: linear-gradient(45deg, rgba(217, 217, 217, 0.327), hsl(var(--background)), rgb(217, 217, 217, 0.327), hsl(var(--background)));
-  /*background: linear-gradient(45deg, #d2001a, #7462ff, #f48e21, #23d5ab);*/
-  background-size: 300%;
-  opacity: 2;
-  animation: color 12s ease-in-out infinite;
-}
-
-@keyframes color
-{
-  0%{
-    background-position: 0% 50%;
-  }
-  50%{
-    background-position: 100% 50%;
-  }
-  100%{
-    background-position: 0% 50%;
-  }
-}
-
-.circle{
-  position: relative;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  background-color: #f0f0f0;
-}
-
-.s-div{
-  position: absolute;
-  width: 50px;
-  height: 50px;
-  border-radius: 50%;
-  background-color: #007bff;
-  animation: move 2s infinite;
-}
-
-
-@keyframes move {
-  0% {
-    transform: translateX(0);
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateX(100px) translateY(100px);
-  }
-  100% {
-    transform: translateX(0);
-    transform: translateY(0);
-  }
-}
-
-.parallax-section {
-  transform: translateY(0);
-  transition: transform 0.5s ease-in-out;
-}
-
-.parallax-section.bg-scroll {
-  transform: translateY(-20%);
-}
-
-.ani-shadow{
-  content: " ";
-  position: absolute;
-  top: -4px;
-  left: -4px;
-  background: linear-gradient(45deg, #fb0094, #0000ff, #00ff00, #ffff00, #ff0000, #fb0094, #0000ff, #00ff00, #ffff00, #ff0000);
-  background-size: 400%;
-  width: calc(100% + 5px);
-  height: calc(100% + 5px);
-  z-index: -1;
-  animation: bganimate 20s linear infinite;
-}
-
-.ani-shadow::after {
-  filter: blur(20px);
-}
-
-@keyframes bganimate {
-  0%{
-    background-position: 0% 0%;
-  }
-  50%{
-    background-position: 400% 0%;
-  }
-  100%{
-    background-position: 0% 0%;
-  }
-}
-
-.grad-trans{
-  background: linear-gradient(to right, hsl(var(--secondary)) 0%, rgba(0, 0, 0, 0) 50% 100%);
-}
-
-
-
-================================================================================
-LOCATION: app\layout.tsx
-================================================================================
-
-// @ts-nocheck
-import type { Metadata } from "next";
-// import localFont from "next/font/local";
-import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider"
-import { Providers } from "@/store/providers";
-import Navbar from "@/components/utility/navbar";
-import { AppContextProvider } from "@/context/appContext";
-import { Footer } from "@/components/myComponents/subs/footer";
-import { CartProvider } from "@/hooks/use-cart";
-import { SessionProvider } from "next-auth/react"
-import { usersession } from "@/session";
-import { VisitTracker } from "@/components/utility/VisitTracker";
-// import {Roboto} from "next/font/google"
-
-// const roboto = Roboto({
-//   subsets : ["latin"], style : "normal"
-// });
-
-// const geistSans = localFont({
-//   src: "./fonts/GeistVF.woff",
-//   variable: "--font-geist-sans",
-//   weight: "100 900",
-// });
-// const geistMono = localFont({
-//   src: "./fonts/GeistMonoVF.woff",
-//   variable: "--font-geist-mono",
-//   weight: "100 900",
-// });
-
-interface Session {
-  user?: {
-    name?: string
-    email?: string
-    image?: string
-  }
-  expires: string
-}
-
-const metadata: Metadata = {
-  title: "Succo Stores",
-  description: "Your store for your satisfaction",
-};
-
-export const SEO_CONFIG = {
-  description: 'Your one stop store for food items',
-  fullName: "Succo Stores",
-  name: "Succo Stores",
-  slogan: "Succo Stores",
-};
-
-export const SYSTEM_CONFIG = {
-  redirectAfterSignIn: "/dashboard/uploads",
-  redirectAfterSignUp: "/dashboard/uploads",
-  // repoName: "relivator",
-  // repoOwner: "blefnk",
-  // repoStars: true,
-};
-
-export default async function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  const session: Session | null = await usersession();
-  return (
-    <html lang="en">
-      <SessionProvider session={session}>
-        <AppContextProvider>
-          <body
-            className={`font-roboto_mono antialiased`}
-          // ${geistSans.variable} ${geistMono.variable}
-          >
-            <Providers>
-              <CartProvider>
-                <ThemeProvider
-                  attribute="class"
-                  defaultTheme="light"
-                  enableSystem
-                  disableTransitionOnChange
-                >
-                  <VisitTracker />
-                  <Navbar />
-                  {children}
-                  <Footer />
-                </ThemeProvider>
-              </CartProvider>
-            </Providers>
-          </body>
-        </AppContextProvider>
-      </SessionProvider>
-    </html>
-  );
-}
-
-
-================================================================================
-LOCATION: app\page.tsx
-================================================================================
-
-"use client"
-import HomeComponent from "./home/page";
-
-export default function Home() {
-  return (
-    <div>
-      <HomeComponent />
-    </div>
-  );
-}
-
-
-
-================================================================================
 LOCATION: app\about\page.tsx
 ================================================================================
 
@@ -1611,9 +516,20 @@ import Countup from "react-countup"
 import contact from "@/data/cont"
 // import Footer from "@/components/myComponents/subs/footer"
 import { useAppContext } from "@/hooks/useAppContext"
+import { getSiteSettings } from "@/server/action/siteSettings"
+import { AdminEditable } from "@/components/myComponents/subs/AdminEditable"
+import { useEffect, useState } from "react"
 
 const About = () => {
   const { selectedVideo, setSelectedVideo, useMock } = useAppContext();
+  const [settings, setSettings] = useState<any>(null);
+
+  useEffect(() => {
+    getSiteSettings().then(setSettings);
+  }, []);
+
+  const aboutText = settings?.aboutText || Stats.about.join(" ");
+
   return (
     <motion.section 
       initial = {{ opacity: 0 }}
@@ -1847,6 +763,141 @@ export default Account
 
 
 
+
+
+
+================================================================================
+LOCATION: app\admin\analytics\page.tsx
+================================================================================
+
+"use client";
+
+import { KpiSection } from "@/components/analytics/KpiSection";
+import { ChartCard } from "@/components/analytics/cards/ChartCard";
+import { RevenueChart } from "@/components/analytics/charts/RevenueChart";
+import { CartStatusChart } from "@/components/analytics/charts/CartStatusChart";
+import { TopProductsChart } from "@/components/analytics/charts/TopProductsChart";
+import { ProfitChart } from "@/components/analytics/charts/ProfitChart";
+import { VisitAnalysisChart } from "@/components/analytics/charts/VisitAnalysisChart";
+import { RefundReasonChart } from "@/components/analytics/charts/RefundReasonChart";
+import { Button } from "@/components/ui/button";
+import { Download, Calendar as CalendarIcon } from "lucide-react";
+import { useState } from "react";
+import { DateRange } from "react-day-picker";
+import { format, subDays } from "date-fns";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { useEffect } from "react";
+
+export default function AnalyticsDashboard() {
+    const [date, setDate] = useState<DateRange | undefined>({
+        from: subDays(new Date(), 30),
+        to: new Date(),
+    });
+    const [data, setData] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const queryParams = {
+        from: date?.from?.toISOString(),
+        to: date?.to?.toISOString()
+    };
+
+    useEffect(() => {
+        if (!queryParams.from || !queryParams.to) return;
+        
+        setIsLoading(true);
+        fetch(`/api/analytics?from=${queryParams.from}&to=${queryParams.to}`)
+            .then(res => res.json())
+            .then(json => {
+                setData(json);
+                setIsLoading(false);
+            })
+            .catch(err => {
+                console.error("Failed to fetch analytics:", err);
+                setIsLoading(false);
+            });
+    }, [queryParams.from, queryParams.to]);
+
+    return (
+        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
+            <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between space-x-2">
+                <h2 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h2>
+                <div className="flex items-center space-x-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="justify-start text-left font-normal w-[240px]">
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {date?.from ? (
+                                    date.to ? (
+                                        <>
+                                            {format(date.from, "LLL dd, y")} -{" "}
+                                            {format(date.to, "LLL dd, y")}
+                                        </>
+                                    ) : (
+                                        format(date.from, "LLL dd, y")
+                                    )
+                                ) : (
+                                    <span>Pick a date range</span>
+                                )}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="end">
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={date?.from}
+                                selected={date}
+                                onSelect={setDate}
+                                numberOfMonths={2}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                    <Button>
+                        <Download className="mr-2 h-4 w-4" />
+                        Export
+                    </Button>
+                </div>
+            </div>
+
+            {isLoading && !data ? (
+                <div className="flex items-center justify-center h-64">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                </div>
+            ) : (
+                <>
+                    <KpiSection data={data?.kpis} isLoading={isLoading} />
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                        <ChartCard title="Revenue Over Time" className="col-span-4">
+                            <RevenueChart data={data?.revenueOverTime} isLoading={isLoading} />
+                        </ChartCard>
+                        <ChartCard title="Cart Status Distribution" className="col-span-3">
+                            <CartStatusChart data={data?.cartStatusCounts} isLoading={isLoading} />
+                        </ChartCard>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                        <ChartCard title="Profit & Revenue Analysis" className="col-span-4">
+                            <ProfitChart data={data?.profitOverTime} isLoading={isLoading} />
+                        </ChartCard>
+                        <ChartCard title="Top Selling Products" className="col-span-3">
+                            <TopProductsChart data={data?.topProducts} isLoading={isLoading} />
+                        </ChartCard>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+                        <ChartCard title="Page Visit Analysis" className="col-span-4">
+                            <VisitAnalysisChart data={data?.visits} isLoading={isLoading} />
+                        </ChartCard>
+                        <ChartCard title="Refund Reasons" className="col-span-3">
+                            <RefundReasonChart data={data?.refunds} isLoading={isLoading} />
+                        </ChartCard>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
 
 
 
@@ -2257,114 +1308,6 @@ export default Admin;
 
 
 ================================================================================
-LOCATION: app\admin\analytics\page.tsx
-================================================================================
-
-"use client";
-
-import { KpiSection } from "@/components/analytics/KpiSection";
-import { ChartCard } from "@/components/analytics/cards/ChartCard";
-import { RevenueChart } from "@/components/analytics/charts/RevenueChart";
-import { CartStatusChart } from "@/components/analytics/charts/CartStatusChart";
-import { TopProductsChart } from "@/components/analytics/charts/TopProductsChart";
-import { ProfitChart } from "@/components/analytics/charts/ProfitChart";
-import { VisitAnalysisChart } from "@/components/analytics/charts/VisitAnalysisChart";
-import { RefundReasonChart } from "@/components/analytics/charts/RefundReasonChart";
-import { Button } from "@/components/ui/button";
-import { Download, Calendar as CalendarIcon } from "lucide-react";
-import { useState } from "react";
-import { DateRange } from "react-day-picker";
-import { format, subDays } from "date-fns";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-
-export default function AnalyticsDashboard() {
-    const [date, setDate] = useState<DateRange | undefined>({
-        from: subDays(new Date(), 30),
-        to: new Date(),
-    });
-
-    const queryParams = {
-        from: date?.from?.toISOString(),
-        to: date?.to?.toISOString()
-    };
-
-    return (
-        <div className="flex-1 space-y-6 p-4 md:p-8 pt-6">
-            <div className="flex flex-col space-y-2 md:flex-row md:items-center md:justify-between space-x-2">
-                <h2 className="text-3xl font-bold tracking-tight">Analytics Dashboard</h2>
-                <div className="flex items-center space-x-2">
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="justify-start text-left font-normal w-[240px]">
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {date?.from ? (
-                                    date.to ? (
-                                        <>
-                                            {format(date.from, "LLL dd, y")} -{" "}
-                                            {format(date.to, "LLL dd, y")}
-                                        </>
-                                    ) : (
-                                        format(date.from, "LLL dd, y")
-                                    )
-                                ) : (
-                                    <span>Pick a date range</span>
-                                )}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar
-                                initialFocus
-                                mode="range"
-                                defaultMonth={date?.from}
-                                selected={date}
-                                onSelect={setDate}
-                                numberOfMonths={2}
-                            />
-                        </PopoverContent>
-                    </Popover>
-                    <Button>
-                        <Download className="mr-2 h-4 w-4" />
-                        Export
-                    </Button>
-                </div>
-            </div>
-
-            <KpiSection params={queryParams} />
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <ChartCard title="Revenue Over Time" className="col-span-4">
-                    <RevenueChart params={queryParams} />
-                </ChartCard>
-                <ChartCard title="Cart Status Distribution" className="col-span-3">
-                    <CartStatusChart params={queryParams} />
-                </ChartCard>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <ChartCard title="Profit & Revenue Analysis" className="col-span-4">
-                    <ProfitChart params={queryParams} />
-                </ChartCard>
-                <ChartCard title="Top Selling Products" className="col-span-3">
-                    <TopProductsChart params={queryParams} />
-                </ChartCard>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <ChartCard title="Page Visit Analysis" className="col-span-4">
-                    <VisitAnalysisChart params={queryParams} />
-                </ChartCard>
-                <ChartCard title="Refund Reasons (Mock)" className="col-span-3">
-                    <RefundReasonChart params={queryParams} />
-                </ChartCard>
-            </div>
-        </div>
-    );
-}
-
-
-
-================================================================================
 LOCATION: app\api\admin\analytics\route.ts
 ================================================================================
 
@@ -2594,6 +1537,202 @@ async function getKPIs(from: Date, to: Date) {
         newUsers: userCount,
         totalUsers
     };
+}
+
+
+
+================================================================================
+LOCATION: app\api\analytics\route.ts
+================================================================================
+
+import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const fromStr = searchParams.get("from");
+  const toStr = searchParams.get("to");
+
+  if (!fromStr || !toStr) {
+    return NextResponse.json({ error: "Missing from or to date" }, { status: 400 });
+  }
+
+  const from = new Date(fromStr);
+  const to = new Date(toStr);
+
+  try {
+    /* ================= PAID CARTS FOR REVENUE & PROFIT ================= */
+    const paidCarts = await prisma.cart.findMany({
+      where: {
+        status: "paid",
+        createdAt: { gte: from, lte: to },
+      },
+      include: {
+        products: {
+          include: { product: true }
+        }
+      }
+    });
+
+    const totalRevenue = paidCarts.reduce(
+      (sum, cart) => sum + cart.total,
+      0
+    );
+
+    const totalCost = paidCarts.reduce((sum, cart) => {
+      const cost = cart.products.reduce((pSum, item) => {
+        return pSum + (item.product.costPrice || 0) * item.quantity;
+      }, 0);
+      return sum + cost;
+    }, 0);
+
+    const totalProfit = totalRevenue - totalCost;
+
+    /* ================= REVENUE OVER TIME (For chart) ================= */
+    // Grouping by day manually as Prisma doesn't do it easily for MongoDB
+    const revenueByDay: Record<string, number> = {};
+    paidCarts.forEach(cart => {
+      const day = cart.createdAt.toISOString().split("T")[0];
+      revenueByDay[day] = (revenueByDay[day] || 0) + cart.total;
+    });
+
+    const revenueOverTime = Object.entries(revenueByDay).map(([date, revenue]) => ({
+      date,
+      revenue
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    /* ================= PROFIT OVER TIME (For chart) ================= */
+    const profitByDay: Record<string, { revenue: number; cost: number; profit: number }> = {};
+    paidCarts.forEach(cart => {
+      const day = cart.createdAt.toISOString().split("T")[0];
+      const cost = cart.products.reduce((pSum, item) => {
+        return pSum + (item.product.costPrice || 0) * item.quantity;
+      }, 0);
+      
+      if (!profitByDay[day]) {
+        profitByDay[day] = { revenue: 0, cost: 0, profit: 0 };
+      }
+      profitByDay[day].revenue += cart.total;
+      profitByDay[day].cost += cost;
+      profitByDay[day].profit += (cart.total - cost);
+    });
+
+    const profitOverTime = Object.entries(profitByDay).map(([date, stats]) => ({
+      date,
+      ...stats
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    /* ================= CART STATUS DISTRIBUTION ================= */
+    const cartStatusCountsRaw = await prisma.cart.groupBy({
+      by: ["status"],
+      where: {
+        createdAt: { gte: from, lte: to },
+      },
+      _count: { status: true },
+    });
+
+    const cartStatusCounts = cartStatusCountsRaw.map(c => ({
+      name: c.status,
+      value: c._count.status
+    }));
+
+    /* ================= TOP PRODUCTS ================= */
+    const topProductsRaw = await prisma.cartItem.groupBy({
+      by: ["productId"],
+      where: {
+        cart: {
+          status: "paid",
+          createdAt: { gte: from, lte: to }
+        }
+      },
+      _sum: { quantity: true },
+      orderBy: { _sum: { quantity: "desc" } },
+      take: 5,
+    });
+
+    const productIds = topProductsRaw.map(p => p.productId);
+
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true }
+    });
+
+    const topProducts = topProductsRaw.map(tp => {
+      const prod = products.find(p => p.id === tp.productId);
+      return {
+        name: prod?.name || "Unknown",
+        quantity: tp._sum.quantity,
+      };
+    });
+
+    /* ================= VISITS OVER TIME ================= */
+    const visitsRaw = await prisma.visit.findMany({
+      where: {
+        createdAt: { gte: from, lte: to },
+      },
+      select: { createdAt: true }
+    });
+
+    const visitsByDay: Record<string, number> = {};
+    visitsRaw.forEach(v => {
+      const day = v.createdAt.toISOString().split("T")[0];
+      visitsByDay[day] = (visitsByDay[day] || 0) + 1;
+    });
+
+    const visits = Object.entries(visitsByDay).map(([date, count]) => ({
+      date,
+      count
+    })).sort((a, b) => a.date.localeCompare(b.date));
+
+    /* ================= REFUND REASONS ================= */
+    const refundsRaw = await prisma.refund.groupBy({
+      by: ["reason"],
+      where: {
+        createdAt: { gte: from, lte: to },
+      },
+      _count: { reason: true },
+    });
+
+    const refunds = refundsRaw.map(d => ({
+      reason: d.reason || "No reason",
+      count: d._count.reason
+    }));
+
+    /* ================= KPIs ================= */
+    const ordersCount = paidCarts.length;
+    
+    const refundAgg = await prisma.refund.aggregate({
+      where: { createdAt: { gte: from, lte: to } },
+      _sum: { amount: true }
+    });
+
+    const newUsers = await prisma.user.count({
+      where: { createdAt: { gte: from, lte: to } }
+    });
+
+    const totalUsers = await prisma.user.count();
+
+    return NextResponse.json({
+      revenue: totalRevenue,
+      profit: totalProfit,
+      revenueOverTime,
+      profitOverTime,
+      cartStatusCounts,
+      topProducts,
+      visits,
+      refunds,
+      kpis: {
+        totalRevenue,
+        totalOrders: ordersCount,
+        totalRefunds: refundAgg._sum.amount || 0,
+        newUsers,
+        totalUsers
+      }
+    });
+  } catch (error) {
+    console.error("Analytics API Error:", error);
+    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  }
 }
 
 
@@ -4825,6 +3964,7 @@ async function dbHandler({
                 categoryId: body.categoryId,
                 category: body.category,
                 price: parseFloat(body.price),
+                costPrice: body.costPrice ? parseFloat(body.costPrice) : null,
               // images: {
               //   push: body.url,
               // },
@@ -5021,6 +4161,7 @@ export async function POST(req , res) {
       categoryId: Formdata.get("categoryId"),
       //category: Formdata.get("category"),
       price: parseFloat(Formdata.get("price")),
+      costPrice: Formdata.get("costPrice") ? parseFloat(Formdata.get("costPrice")) : null,
       url: cldRes.url,
     },
   });
@@ -6047,6 +5188,266 @@ export default Contact
 
 
 ================================================================================
+LOCATION: app\globals.css
+================================================================================
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 30 98% 50%;
+    --accent-secondary: 107 77% 50%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 30 98% 50%;
+    --accent-secondary: 107 77% 76%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+
+
+@font-face {
+  font-family: dance;
+  src: url("./fonts/dancing/DancingScript-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: roboto_mono;
+  src: url("./fonts/Roboto_Mono/static/AnyConv.com__RobotoMono-Medium.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+@font-face {
+  font-family: roboto;
+  src: url("./fonts/Roboto/AnyConv.com__Roboto-Regular.woff2") format("woff2");
+  font-weight: normal;
+  font-style: normal;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.text-outline {
+  -webkit-text-stroke: 1px hsl(var(--accent));
+}
+
+.text-outline-positive {
+  -webkit-text-stroke: 1px hsl(var(--accent-secondary));
+}
+
+.text-outline-none {
+  -webkit-text-stroke: 0px hsl(var(--accent));
+}
+
+
+.bg-blur{
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.glass{
+  background: rgba(255, 255, 255, 0.31);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.glass-outline{
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(8.6px);
+  -webkit-backdrop-filter: blur(8.6px);
+  border: 1px solid rgba(255, 255, 255, 1);
+}
+
+.glass-green{
+  background: rgba(0, 255, 80, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(11.4px);
+  -webkit-backdrop-filter: blur(11.4px);
+  border: 1px solid rgba(0, 255, 80, 0.4);
+}
+
+.glow-green{
+  -webkit-box-shadow:0px 0px 72px 22px rgba(45,255,196,0.55);
+  -moz-box-shadow: 0px 0px 72px 22px rgba(45,255,196,0.55);
+  box-shadow: 0px 0px 72px 22px rgba(45,255,196,0.55);
+}
+
+.glow-text{
+  text-shadow: rgba(255,162,0,0.77) 0px 0px 39px;
+}
+
+.gradient-text{
+  background: linear-gradient(90deg, hsl(var(--accent)), hsl(var(--primary)));
+  /*font-family: Poppins;*/
+  /*text-transform: uppercase;*/
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.animated-bg-gradient{
+  background: linear-gradient(45deg, rgba(217, 217, 217, 0.327), hsl(var(--background)), rgb(217, 217, 217, 0.327), hsl(var(--background)));
+  /*background: linear-gradient(45deg, #d2001a, #7462ff, #f48e21, #23d5ab);*/
+  background-size: 300%;
+  opacity: 2;
+  animation: color 12s ease-in-out infinite;
+}
+
+@keyframes color
+{
+  0%{
+    background-position: 0% 50%;
+  }
+  50%{
+    background-position: 100% 50%;
+  }
+  100%{
+    background-position: 0% 50%;
+  }
+}
+
+.circle{
+  position: relative;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  background-color: #f0f0f0;
+}
+
+.s-div{
+  position: absolute;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background-color: #007bff;
+  animation: move 2s infinite;
+}
+
+
+@keyframes move {
+  0% {
+    transform: translateX(0);
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateX(100px) translateY(100px);
+  }
+  100% {
+    transform: translateX(0);
+    transform: translateY(0);
+  }
+}
+
+.parallax-section {
+  transform: translateY(0);
+  transition: transform 0.5s ease-in-out;
+}
+
+.parallax-section.bg-scroll {
+  transform: translateY(-20%);
+}
+
+.ani-shadow{
+  content: " ";
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  background: linear-gradient(45deg, #fb0094, #0000ff, #00ff00, #ffff00, #ff0000, #fb0094, #0000ff, #00ff00, #ffff00, #ff0000);
+  background-size: 400%;
+  width: calc(100% + 5px);
+  height: calc(100% + 5px);
+  z-index: -1;
+  animation: bganimate 20s linear infinite;
+}
+
+.ani-shadow::after {
+  filter: blur(20px);
+}
+
+@keyframes bganimate {
+  0%{
+    background-position: 0% 0%;
+  }
+  50%{
+    background-position: 400% 0%;
+  }
+  100%{
+    background-position: 0% 0%;
+  }
+}
+
+.grad-trans{
+  background: linear-gradient(to right, hsl(var(--secondary)) 0%, rgba(0, 0, 0, 0) 50% 100%);
+}
+
+
+
+================================================================================
 LOCATION: app\help\page.tsx
 ================================================================================
 
@@ -6124,6 +5525,109 @@ const Home = () => {
 
 export default Home
 
+
+
+================================================================================
+LOCATION: app\layout.tsx
+================================================================================
+
+// @ts-nocheck
+import type { Metadata } from "next";
+// import localFont from "next/font/local";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider"
+import { Providers } from "@/store/providers";
+import Navbar from "@/components/utility/navbar";
+import { AppContextProvider } from "@/context/appContext";
+import { Footer } from "@/components/myComponents/subs/footer";
+import { CartProvider } from "@/hooks/use-cart";
+import { SessionProvider } from "next-auth/react"
+import { usersession } from "@/session";
+import { VisitTracker } from "@/components/utility/VisitTracker";
+// import {Roboto} from "next/font/google"
+
+// const roboto = Roboto({
+//   subsets : ["latin"], style : "normal"
+// });
+
+// const geistSans = localFont({
+//   src: "./fonts/GeistVF.woff",
+//   variable: "--font-geist-sans",
+//   weight: "100 900",
+// });
+// const geistMono = localFont({
+//   src: "./fonts/GeistMonoVF.woff",
+//   variable: "--font-geist-mono",
+//   weight: "100 900",
+// });
+
+interface Session {
+  user?: {
+    name?: string
+    email?: string
+    image?: string
+  }
+  expires: string
+}
+
+const metadata: Metadata = {
+  title: "Succo Stores",
+  description: "Your store for your satisfaction",
+};
+
+export const SEO_CONFIG = {
+  description: 'Your one stop store for food items',
+  fullName: "Succo Stores",
+  name: "Succo Stores",
+  slogan: "Succo Stores",
+};
+
+export const SYSTEM_CONFIG = {
+  redirectAfterSignIn: "/dashboard/uploads",
+  redirectAfterSignUp: "/dashboard/uploads",
+  // repoName: "relivator",
+  // repoOwner: "blefnk",
+  // repoStars: true,
+};
+
+import { Toaster } from "@/components/ui/sonner"
+
+export default async function RootLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
+  const session: Session | null = await usersession();
+  return (
+    <html lang="en">
+      <SessionProvider session={session}>
+        <AppContextProvider>
+          <body
+            className={`font-roboto_mono antialiased`}
+          // ${geistSans.variable} ${geistMono.variable}
+          >
+            <Providers>
+              <CartProvider>
+                <ThemeProvider
+                  attribute="class"
+                  defaultTheme="light"
+                  enableSystem
+                  disableTransitionOnChange
+                >
+                  <VisitTracker />
+                  <Navbar />
+                  {children}
+                  <Toaster />
+                  <Footer />
+                </ThemeProvider>
+              </CartProvider>
+            </Providers>
+          </body>
+        </AppContextProvider>
+      </SessionProvider>
+    </html>
+  );
+}
 
 
 ================================================================================
@@ -6651,6 +6155,23 @@ export default page
 
 
 ================================================================================
+LOCATION: app\page.tsx
+================================================================================
+
+"use client"
+import HomeComponent from "./home/page";
+
+export default function Home() {
+  return (
+    <div>
+      <HomeComponent />
+    </div>
+  );
+}
+
+
+
+================================================================================
 LOCATION: app\signup\page.tsx
 ================================================================================
 
@@ -6742,6 +6263,7 @@ import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import Stocks from '@/components/myComponents/subs/stocks';
 import { SearchInput } from '@/components/myComponents/subs/searchcomponent';
+import { FloatingAddButton } from '@/components/myComponents/subs/FloatingAddButton';
 
 const Store = () => {
   const searchParams = useSearchParams();
@@ -6762,6 +6284,7 @@ const Store = () => {
         </div>
         <Stocks categoryFilter={category} search={search} selectedId={id} />
       </div>
+      <FloatingAddButton />
     </motion.section>
   );
 };
@@ -7331,6 +6854,129 @@ export default function ProductDetailPage() {
 
 
 ================================================================================
+LOCATION: auth.ts
+================================================================================
+
+// @ts-nocheck
+import NextAuth from "next-auth";
+import Credentials from "next-auth/providers/credentials";
+import Google from "next-auth/providers/google";
+import FacebookProvider from "next-auth/providers/facebook";
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+import { PrismaAdapter } from '@auth/prisma-adapter';
+
+export const { handlers, signIn, signOut, auth } = NextAuth({
+  trustHost: true,
+  adapter: PrismaAdapter(prisma),
+  providers: [
+    Credentials({
+      name: "Credentials",
+      credentials: {
+        email: { label: "Email/Contact", type: "text" },
+        password: { label: "Password", type: "password" },
+      },
+      authorize: async (credentials) => {
+        const identifier = credentials?.email; // This will hold either email or contact
+        const password = credentials?.password;
+        if (!identifier || !password) throw new Error("Please provide email/contact & password");
+
+        // Try finding by email first, then by contact
+        const user = await prisma.user.findFirst({
+          where: {
+            OR: [
+              { email: identifier },
+              { contact: identifier }
+            ]
+          }
+        });
+
+        if (!user) throw new Error("Invalid email/contact or password");
+        
+        // Differentiate OAuth users who haven't set a password
+        if (!user.password) {
+          throw new Error("SocialLoginOnly");
+        }
+
+        const isMatched = await bcrypt.compare(password, user.password);
+        if (!isMatched) throw new Error("Invalid email/contact or password");
+
+        return {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          contact: user.contact,
+          role: user.role,
+          image: user.image,
+          providerid: user.providerid,
+        };
+      },
+    }),
+    Google({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+    }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_CLIENT_ID,
+      clientSecret: process.env.FACEBOOK_CLIENT_SECRET
+    }),
+  ],
+
+  callbacks: {
+    // Persist all user info in the JWT token
+    async jwt({ token, user, account }) {
+      if (user) {
+        token.id = user.id;
+        token.name = user.name ?? null;
+        token.email = user.email ?? null;
+        token.contact = user.contact ?? null;
+        token.role = user.role ?? null;
+        token.image = user.image ?? null;
+        token.providerid = user.providerid ?? null;
+      }
+      return token;
+    },
+
+    // Make the token info available in the session object
+    async session({ session, token }) {
+      if (token) {
+        session.user.id = token.id as string;
+        session.user.name = token.name as string ?? null;
+        session.user.email = token.email as string ?? null;
+        session.user.contact = token.contact as string ?? null;
+        session.user.role = token.role as string ?? null;
+        session.user.image = token.image as string ?? null;
+        session.user.providerid = token.providerid as string ?? null;
+        
+        // Fetch addresses here instead of storing in JWT
+        session.user.addresses = await prisma.shippingAddress.findMany({
+          where: { userId: token.id as string },
+        });
+        session.user.shippingAddress = session.user.addresses[0] || null;
+      }
+      return session;
+    },
+  },
+
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+    updateAge: 24 * 60 * 60, // 24 hours
+  },
+
+  jwt: {
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
+
+  secret: process.env.AUTH_SECRET,
+  debug: process.env.NODE_ENV === "development",
+});
+
+export const runtime = "nodejs";
+
+
+
+================================================================================
 LOCATION: bin\middleware.ts
 ================================================================================
 
@@ -7353,6 +6999,479 @@ LOCATION: bin\middleware.ts
 // export { default } from "next-auth/middleware"
 
 // export const config = { matcher: ["/admin"] }
+
+
+================================================================================
+LOCATION: components\analytics\analytics.tsx
+================================================================================
+
+
+
+
+================================================================================
+LOCATION: components\analytics\cards\ChartCard.tsx
+================================================================================
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
+
+interface ChartCardProps {
+    title: string;
+    children: React.ReactNode;
+    className?: string;
+    action?: React.ReactNode;
+}
+
+export function ChartCard({ title, children, className, action }: ChartCardProps) {
+    return (
+        <Card className={cn("w-full shadow-sm hover:shadow-md transition-shadow", className)}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-base font-semibold">{title}</CardTitle>
+                {action && <div>{action}</div>}
+            </CardHeader>
+            <CardContent className="pt-4">
+                {children}
+            </CardContent>
+        </Card>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\cards\KpiCard.tsx
+================================================================================
+
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface KpiCardProps {
+    title: string;
+    value: string | number;
+    description?: string;
+    icon?: React.ReactNode;
+    trend?: "up" | "down" | "neutral";
+}
+
+export function KpiCard({ title, value, description, icon }: KpiCardProps) {
+    return (
+        <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{title}</CardTitle>
+                {icon && <div className="text-muted-foreground">{icon}</div>}
+            </CardHeader>
+            <CardContent>
+                <div className="text-2xl font-bold">{value}</div>
+                {description && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                        {description}
+                    </p>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\CartStatusChart.tsx
+================================================================================
+
+"use client";
+
+import { useAnalytics } from "../hooks/useAnalytics";
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+
+const COLORS = ["#00C49F", "#FFBB28", "#FF8042", "#0088FE"];
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function CartStatusChart({ data, isLoading }: ChartProps) {
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+    if (!data || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
+
+    return (
+        <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={data}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                    >
+                        {data.map((entry: any, index: number) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\ProfitChart.tsx
+================================================================================
+
+"use client";
+
+import { useAnalytics } from "../hooks/useAnalytics";
+import { ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { format } from "date-fns";
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function ProfitChart({ data, isLoading }: ChartProps) {
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
+
+    const formattedData = data.map((d: any) => ({
+        ...d,
+        dateStr: format(new Date(d.date), "MMM d"),
+    }));
+
+    return (
+        <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={formattedData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                    <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Legend />
+                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Revenue" barSize={30} />
+                    <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} name="Profit" />
+                </ComposedChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\RefundReasonChart.tsx
+================================================================================
+
+"use client";
+
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
+
+const COLORS = ["#00C49F", "#FFBB28", "#FF8042", "#0088FE", "#8884d8"];
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function RefundReasonChart({ data, isLoading }: ChartProps) {
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+
+    // Mock data for reasons if API only returns total list, or if API response structure is just list of amounts
+    // For now let's assume we want to visualize this even if data is simple
+    // If data is just array of { date, amount }, we can't do reasons.
+    // Let's create a derived dummy breakdown or just return null if no reasons data.
+
+    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+
+    // Placeholder logic until DB supports refund reasons
+    const dummyData = [
+        { name: "Damaged", value: 4 },
+        { name: "Wrong Item", value: 2 },
+        { name: "Late Delivery", value: 1 },
+        { name: "Changed Mind", value: 3 },
+    ];
+
+    return (
+        <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                    <Pie
+                        data={dummyData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        paddingAngle={5}
+                        dataKey="value"
+                    >
+                        {dummyData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\RevenueChart.tsx
+================================================================================
+
+import { useAnalytics } from "../hooks/useAnalytics";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, BarChart, Bar } from "recharts";
+import { format } from "date-fns";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function RevenueChart({ data, isLoading }: ChartProps) {
+    const [chartType, setChartType] = useState<"line" | "area" | "bar">("line");
+
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
+
+    // Simple aggregation or formatting if needed
+    const formattedData = data.map((d: any) => ({
+        ...d,
+        dateStr: format(new Date(d.date), "MMM d"),
+    }));
+
+    return (
+        <div className="space-y-4">
+            <div className="flex justify-end space-x-2">
+                <Button variant={chartType === "line" ? "default" : "outline"} size="sm" onClick={() => setChartType("line")}>Line</Button>
+                <Button variant={chartType === "area" ? "default" : "outline"} size="sm" onClick={() => setChartType("area")}>Area</Button>
+                <Button variant={chartType === "bar" ? "default" : "outline"} size="sm" onClick={() => setChartType("bar")}>Bar</Button>
+            </div>
+            <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    {chartType === "line" ? (
+                        <LineChart data={formattedData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                                itemStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
+                        </LineChart>
+                    ) : chartType === "area" ? (
+                        <AreaChart data={formattedData}>
+                            <defs>
+                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                                itemStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" />
+                        </AreaChart>
+                    ) : (
+                        <BarChart data={formattedData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                                itemStyle={{ color: "hsl(var(--foreground))" }}
+                            />
+                            <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    )}
+                </ResponsiveContainer>
+            </div>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\TopProductsChart.tsx
+================================================================================
+
+"use client";
+
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function TopProductsChart({ data, isLoading }: ChartProps) {
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+    if (!data || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
+
+    return (
+        <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart layout="vertical" data={data} margin={{ left: 40, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                    <XAxis type="number" hide />
+                    <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
+                    <Tooltip
+                        cursor={{ fill: "transparent" }}
+                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Bar dataKey="quantity" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\charts\VisitAnalysisChart.tsx
+================================================================================
+
+"use client";
+
+import { useAnalytics } from "../hooks/useAnalytics";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
+import { format } from "date-fns";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+
+interface ChartProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function VisitAnalysisChart({ data, isLoading }: ChartProps) {
+    if (isLoading && !data) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
+    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
+
+    const formattedData = data.map((d: any) => ({
+        ...d,
+        dateStr: format(new Date(d.date), "MMM d"),
+    }));
+
+    return (
+        <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={formattedData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
+                    <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
+                    <Tooltip
+                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
+                        itemStyle={{ color: "hsl(var(--foreground))" }}
+                    />
+                    <Bar dataKey="count" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                </BarChart>
+            </ResponsiveContainer>
+        </div>
+    );
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\hooks\useAnalytics.ts
+================================================================================
+
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
+export function useAnalytics(metric: string, params?: Record<string, any>) {
+    const query = new URLSearchParams(params).toString();
+    const { data, error, isLoading } = useSWR(
+        `/api/admin/analytics?metric=${metric}&${query}`,
+        fetcher
+    );
+
+    return {
+        data,
+        isLoading,
+        isError: error,
+    };
+}
+
+
+
+================================================================================
+LOCATION: components\analytics\KpiSection.tsx
+================================================================================
+
+"use client";
+
+import { useAnalytics } from "./hooks/useAnalytics";
+import { KpiCard } from "./cards/KpiCard";
+import { DollarSign, ShoppingCart, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
+
+interface KpiSectionProps {
+    data?: any;
+    isLoading?: boolean;
+}
+
+export function KpiSection({ data, isLoading }: KpiSectionProps) {
+    if (isLoading && !data) return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 w-full h-24 animate-pulse bg-muted rounded-md" />;
+    if (!data) return null;
+
+    return (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <KpiCard
+                title="Total Revenue"
+                value={`₦${data.totalRevenue.toLocaleString()}`}
+                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
+            />
+            <KpiCard
+                title="Total Orders"
+                value={data.totalOrders.toLocaleString()}
+                icon={<ShoppingCart className="h-4 w-4 text-muted-foreground" />}
+            />
+            <KpiCard
+                title="Refunds"
+                value={`₦${data.totalRefunds.toLocaleString()}`}
+                icon={<ArrowDownRight className="h-4 w-4 text-red-500" />}
+            />
+            <KpiCard
+                title="New Users"
+                value={data.newUsers.toLocaleString()}
+                description={`of ${data.totalUsers.toLocaleString()} total`}
+                icon={<Users className="h-4 w-4 text-muted-foreground" />}
+            />
+        </div>
+    );
+}
+
 
 
 ================================================================================
@@ -7591,557 +7710,6 @@ const Modal: React.FC<ModalProps> = ({
 };
 
 export default Modal;
-
-
-
-================================================================================
-LOCATION: components\textArea.tsx
-================================================================================
-
-import React, { ChangeEvent } from "react";
-
-interface TextAreaProps {
-  className?: string;
-  disabled?: boolean;
-  value?: string;
-  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
-  placeholder?: string;
-  rows?: number;
-}
-
-const TextArea: React.FC<TextAreaProps> = ({
-  className,
-  disabled,
-  onChange,
-  rows,
-  ...rest
-}) => {
-  return (
-    <textarea
-      className={`w-full p-1 mb-2 
-        ${disabled ? "" : "border rounded"}
-        ${className || ""}`}
-      rows={rows || 2}
-      onChange={onChange}
-      {...rest}
-    />
-  );
-};
-
-export default TextArea;
-
-
-
-================================================================================
-LOCATION: components\theme-provider.tsx
-================================================================================
-
-'use client'
-
-import * as React from 'react'
-import { type ThemeProviderProps } from 'next-themes'
-import dynamic from 'next/dynamic'
-
-const NextThemesProvider = dynamic(
-	() => import('next-themes').then((e) => e.ThemeProvider),
-	{
-		ssr: false,
-	}
-)
-
-
-
-export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
-	return <NextThemesProvider {...props}>{children}</NextThemesProvider>
-}
-
-
-================================================================================
-LOCATION: components\analytics\analytics.tsx
-================================================================================
-
-
-
-
-================================================================================
-LOCATION: components\analytics\KpiSection.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "./hooks/useAnalytics";
-import { KpiCard } from "./cards/KpiCard";
-import { DollarSign, ShoppingCart, Users, ArrowUpRight, ArrowDownRight } from "lucide-react";
-
-interface KpiSectionProps {
-    params?: Record<string, any>;
-}
-
-export function KpiSection({ params }: KpiSectionProps) {
-    const { data, isLoading } = useAnalytics("kpi", params);
-
-    if (isLoading) return <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 w-full h-24 animate-pulse bg-muted rounded-md" />;
-    if (!data) return null;
-
-    return (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <KpiCard
-                title="Total Revenue"
-                value={`₦${data.totalRevenue.toLocaleString()}`}
-                icon={<DollarSign className="h-4 w-4 text-muted-foreground" />}
-            />
-            <KpiCard
-                title="Total Orders"
-                value={data.totalOrders.toLocaleString()}
-                icon={<ShoppingCart className="h-4 w-4 text-muted-foreground" />}
-            />
-            <KpiCard
-                title="Refunds"
-                value={`₦${data.totalRefunds.toLocaleString()}`}
-                icon={<ArrowDownRight className="h-4 w-4 text-red-500" />}
-            />
-            <KpiCard
-                title="New Users"
-                value={data.newUsers.toLocaleString()}
-                description={`of ${data.totalUsers.toLocaleString()} total`}
-                icon={<Users className="h-4 w-4 text-muted-foreground" />}
-            />
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\cards\ChartCard.tsx
-================================================================================
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-
-interface ChartCardProps {
-    title: string;
-    children: React.ReactNode;
-    className?: string;
-    action?: React.ReactNode;
-}
-
-export function ChartCard({ title, children, className, action }: ChartCardProps) {
-    return (
-        <Card className={cn("w-full shadow-sm hover:shadow-md transition-shadow", className)}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-base font-semibold">{title}</CardTitle>
-                {action && <div>{action}</div>}
-            </CardHeader>
-            <CardContent className="pt-4">
-                {children}
-            </CardContent>
-        </Card>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\cards\KpiCard.tsx
-================================================================================
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-interface KpiCardProps {
-    title: string;
-    value: string | number;
-    description?: string;
-    icon?: React.ReactNode;
-    trend?: "up" | "down" | "neutral";
-}
-
-export function KpiCard({ title, value, description, icon }: KpiCardProps) {
-    return (
-        <Card className="shadow-sm">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                {icon && <div className="text-muted-foreground">{icon}</div>}
-            </CardHeader>
-            <CardContent>
-                <div className="text-2xl font-bold">{value}</div>
-                {description && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                        {description}
-                    </p>
-                )}
-            </CardContent>
-        </Card>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\CartStatusChart.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
-
-const COLORS = ["#00C49F", "#FFBB28", "#FF8042", "#0088FE"];
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function CartStatusChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("cart-status", params);
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-    if (!data || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
-
-    return (
-        <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={data}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        paddingAngle={5}
-                        dataKey="value"
-                    >
-                        {data.map((entry: any, index: number) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                    </Pie>
-                    <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                        itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Legend />
-                </PieChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\ProfitChart.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { format } from "date-fns";
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function ProfitChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("profit", params);
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
-
-    const formattedData = data.map((d: any) => ({
-        ...d,
-        dateStr: format(new Date(d.date), "MMM d"),
-    }));
-
-    return (
-        <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={formattedData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                    <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                        itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Legend />
-                    <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Revenue" barSize={30} />
-                    <Line type="monotone" dataKey="profit" stroke="#10b981" strokeWidth={2} name="Profit" />
-                </ComposedChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\RefundReasonChart.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts";
-
-const COLORS = ["#00C49F", "#FFBB28", "#FF8042", "#0088FE", "#8884d8"];
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function RefundReasonChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("refunds", params); // Assuming we update API to group by reason if possible, or just mock reasons if unimplemented
-
-    // Mock data for reasons if API only returns total list, or if API response structure is just list of amounts
-    // For now let's assume we want to visualize this even if data is simple
-    // If data is just array of { date, amount }, we can't do reasons.
-    // Let's create a derived dummy breakdown or just return null if no reasons data.
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-
-    // Placeholder logic until DB supports refund reasons
-    const dummyData = [
-        { name: "Damaged", value: 4 },
-        { name: "Wrong Item", value: 2 },
-        { name: "Late Delivery", value: 1 },
-        { name: "Changed Mind", value: 3 },
-    ];
-
-    return (
-        <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                    <Pie
-                        data={dummyData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        paddingAngle={5}
-                        dataKey="value"
-                    >
-                        {dummyData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                    </Pie>
-                    <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                        itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Legend />
-                </PieChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\RevenueChart.tsx
-================================================================================
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, AreaChart, Area, BarChart, Bar } from "recharts";
-import { format } from "date-fns";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function RevenueChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("revenue", params);
-    const [chartType, setChartType] = useState<"line" | "area" | "bar">("line");
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
-
-    // Simple aggregation or formatting if needed
-    const formattedData = data.map((d: any) => ({
-        ...d,
-        dateStr: format(new Date(d.date), "MMM d"),
-    }));
-
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-end space-x-2">
-                <Button variant={chartType === "line" ? "default" : "outline"} size="sm" onClick={() => setChartType("line")}>Line</Button>
-                <Button variant={chartType === "area" ? "default" : "outline"} size="sm" onClick={() => setChartType("area")}>Area</Button>
-                <Button variant={chartType === "bar" ? "default" : "outline"} size="sm" onClick={() => setChartType("bar")}>Bar</Button>
-            </div>
-            <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    {chartType === "line" ? (
-                        <LineChart data={formattedData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                                itemStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Line type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                        </LineChart>
-                    ) : chartType === "area" ? (
-                        <AreaChart data={formattedData}>
-                            <defs>
-                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                                itemStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Area type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#colorRevenue)" />
-                        </AreaChart>
-                    ) : (
-                        <BarChart data={formattedData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                            <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <YAxis tickLine={false} axisLine={false} tickFormatter={(val) => `₦${val}`} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                                itemStyle={{ color: "hsl(var(--foreground))" }}
-                            />
-                            <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    )}
-                </ResponsiveContainer>
-            </div>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\TopProductsChart.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip } from "recharts";
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function TopProductsChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("products", params);
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-    if (!data || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No data available</div>;
-
-    return (
-        <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart layout="vertical" data={data} margin={{ left: 40, right: 40 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                    <XAxis type="number" hide />
-                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} tickLine={false} axisLine={false} />
-                    <Tooltip
-                        cursor={{ fill: "hsl(var(--muted)/0.4)" }}
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                        itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Bar dataKey="sales" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} barSize={20} />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\charts\VisitAnalysisChart.tsx
-================================================================================
-
-"use client";
-
-import { useAnalytics } from "../hooks/useAnalytics";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { format } from "date-fns";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-
-interface ChartProps {
-    params?: Record<string, any>;
-}
-
-export function VisitAnalysisChart({ params }: ChartProps) {
-    const { data, isLoading } = useAnalytics("visits", params);
-
-    if (isLoading) return <div className="h-[300px] w-full animate-pulse bg-muted rounded-md" />;
-    if (!data || !Array.isArray(data) || data.length === 0) return <div className="h-[300px] flex items-center justify-center text-muted-foreground">No visit data available</div>;
-
-    // Aggregate visits by date
-    // Data is array of ISO date strings
-    const aggregated = data.reduce((acc: any, dateStr: string) => {
-        const day = format(new Date(dateStr), "yyyy-MM-dd");
-        if (!acc[day]) acc[day] = 0;
-        acc[day]++;
-        return acc;
-    }, {});
-
-    const chartData = Object.keys(aggregated).map(key => ({
-        dateStr: format(new Date(key), "MMM d"),
-        visits: aggregated[key]
-    })).sort((a: any, b: any) => new Date(a.dateStr).getTime() - new Date(b.dateStr).getTime()); // Basic sort relying on MMM d might be risky across years but okay for short term
-
-    return (
-        <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground)/0.2)" />
-                    <XAxis dataKey="dateStr" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                    <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }} />
-                    <Tooltip
-                        contentStyle={{ backgroundColor: "hsl(var(--background))", borderRadius: "8px", border: "1px solid hsl(var(--border))" }}
-                        itemStyle={{ color: "hsl(var(--foreground))" }}
-                    />
-                    <Legend />
-                    <Bar dataKey="visits" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} name="Page Visits" />
-                </BarChart>
-            </ResponsiveContainer>
-        </div>
-    );
-}
-
-
-
-================================================================================
-LOCATION: components\analytics\hooks\useAnalytics.ts
-================================================================================
-
-import useSWR from 'swr';
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-export function useAnalytics(metric: string, params?: Record<string, any>) {
-    const query = new URLSearchParams(params).toString();
-    const { data, error, isLoading } = useSWR(
-        `/api/admin/analytics?metric=${metric}&${query}`,
-        fetcher
-    );
-
-    return {
-        data,
-        isLoading,
-        isError: error,
-    };
-}
 
 
 
@@ -8645,6 +8213,84 @@ export function AddLunchDialog({ isOpen, onClose, productId }: AddLunchDialogPro
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  )
+}
+
+
+
+================================================================================
+LOCATION: components\myComponents\subs\AdminEditable.tsx
+================================================================================
+
+"use client"
+
+import React, { useState, useEffect } from "react"
+import { useIsAdmin } from "@/hooks/useIsAdmin"
+import { Textarea } from "@/components/ui/textarea"
+import { Button } from "@/components/ui/button"
+import { updateSiteSettings } from "@/server/action/siteSettings"
+import { toast } from "sonner"
+import { Edit2, Check, X } from "lucide-react"
+
+interface AdminEditableProps {
+  value: string
+  field: "aboutText" | "addToHome"
+  children: React.ReactNode
+}
+
+export const AdminEditable = ({ value, field, children }: AdminEditableProps) => {
+  const isAdmin = useIsAdmin()
+  const [isEditing, setIsEditing] = useState(false)
+  const [currentValue, setCurrentValue] = useState(value)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setCurrentValue(value)
+  }, [value])
+
+  if (!isAdmin) return <>{children}</>
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    const res = await updateSiteSettings({ [field]: currentValue })
+    if (res.success) {
+      toast.success("Settings updated")
+      setIsEditing(false)
+    } else {
+      toast.error("Failed to update settings")
+    }
+    setIsSaving(false)
+  }
+
+  if (isEditing) {
+    return (
+      <div className="relative group w-full">
+        <Textarea
+          value={currentValue}
+          onChange={(e) => setCurrentValue(e.target.value)}
+          className="min-h-[100px] w-full p-2 border-2 border-primary focus:ring-primary"
+        />
+        <div className="flex gap-2 mt-2 justify-end">
+          <Button size="sm" variant="ghost" onClick={() => { setIsEditing(false); setCurrentValue(value); }}>
+            <X className="h-4 w-4 mr-1" /> Cancel
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={isSaving}>
+            {isSaving ? "Saving..." : <><Check className="h-4 w-4 mr-1" /> Save</>}
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="relative group cursor-pointer" onClick={() => setIsEditing(true)}>
+      <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-primary text-white p-1 rounded-full shadow-lg z-10">
+        <Edit2 className="h-3 w-3" />
+      </div>
+      <div className="group-hover:ring-2 group-hover:ring-primary/50 group-hover:rounded-md transition-all p-1">
+        {children}
+      </div>
+    </div>
   )
 }
 
@@ -11032,7 +10678,7 @@ const FeaturedProducts = () => {
                 BOTTOM CAROUSEL (RTL)
             ================================ */}
             <Carousel
-              opts={{ loop: true, direction: "rtl" }}
+              opts={{ loop: true }}
               plugins={[autoplayRTL.current]}
               className="w-screen  max-w-screen-md mx-auto"
             >
@@ -11578,6 +11224,55 @@ const Filters = () => {
 }
 
 export default Filters
+
+
+
+================================================================================
+LOCATION: components\myComponents\subs\FloatingAddButton.tsx
+================================================================================
+
+"use client"
+
+import React, { useState } from "react"
+import { useIsAdmin } from "@/hooks/useIsAdmin"
+import { Plus } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import ProductForm from "@/prisma/forms/ProductForm"
+
+export const FloatingAddButton = () => {
+  const isAdmin = useIsAdmin()
+  const [isOpen, setIsOpen] = useState(false)
+
+  if (!isAdmin) return null
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogTrigger asChild>
+          <Button
+            size="icon"
+            className="h-14 w-14 rounded-full shadow-2xl bg-primary text-white hover:scale-110 transition-transform"
+          >
+            <Plus className="h-8 w-8" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-md overflow-y-auto max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Add New Product</DialogTitle>
+          </DialogHeader>
+          <ProductForm hideList={true} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
 
 
 
@@ -13871,10 +13566,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { getProductPrice, isProductInStock } from "@/lib/stock-pricing";
-import { Heart, ShoppingCart, Star, Utensils } from "lucide-react";
+import { Heart, ShoppingCart, Star, Utensils, Edit3, Trash2 } from "lucide-react";
 import { AddLunchDialog } from "./AddLunchDialog";
 import Link from "next/link";
 import * as React from "react";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import ProductForm from "@/prisma/forms/ProductForm";
+import axios from "axios";
+import { toast } from "sonner";
 
 type ProductCardProps = Omit<
   React.HTMLAttributes<HTMLDivElement>,
@@ -13989,9 +13695,60 @@ export function ProductCard({
     );
   };
 
+  const isAdmin = useIsAdmin();
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = React.useState(false);
+
+  const handleDeleteProduct = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (confirm(`Are you sure you want to delete ${product.name}?`)) {
+      try {
+        await axios.delete(`/api/dbhandler?model=product&id=${product.id}`);
+        toast.success("Product deleted successfully");
+        window.location.reload(); // Refresh to show changes
+      } catch (err) {
+        toast.error("Failed to delete product");
+      }
+    }
+  };
+
   return (
     <>
-      <div className={cn("group", className)} {...props}>
+      <div className={cn("group relative", className)} {...props}>
+        {/* Admin Actions */}
+        {isAdmin && (
+          <div className="absolute top-2 left-2 flex gap-2 z-30">
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm shadow-sm"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md overflow-y-auto max-h-[90vh]">
+                <DialogHeader>
+                  <DialogTitle>Edit Product: {product.name}</DialogTitle>
+                </DialogHeader>
+                <ProductForm initialProduct={product} hideList={true} />
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              size="icon"
+              variant="destructive"
+              className="h-8 w-8 rounded-full bg-destructive/80 backdrop-blur-sm shadow-sm"
+              onClick={handleDeleteProduct}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
+
         <Link href={`/store/${product.id}`}>
           <Card
             className={cn(
@@ -14024,7 +13781,7 @@ export function ProductCard({
 
               {/* Category badge */}
               <Badge
-                className="absolute top-2 left-2 bg-background/80 backdrop-blur-sm"
+                className="absolute bottom-2 left-2 bg-background/80 backdrop-blur-sm z-10"
                 variant="outline"
               >
                 {categoryName}
@@ -19009,6 +18766,68 @@ export const config = {
          ]
      }
  };
+
+
+================================================================================
+LOCATION: components\textArea.tsx
+================================================================================
+
+import React, { ChangeEvent } from "react";
+
+interface TextAreaProps {
+  className?: string;
+  disabled?: boolean;
+  value?: string;
+  onChange: (e: ChangeEvent<HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  rows?: number;
+}
+
+const TextArea: React.FC<TextAreaProps> = ({
+  className,
+  disabled,
+  onChange,
+  rows,
+  ...rest
+}) => {
+  return (
+    <textarea
+      className={`w-full p-1 mb-2 
+        ${disabled ? "" : "border rounded"}
+        ${className || ""}`}
+      rows={rows || 2}
+      onChange={onChange}
+      {...rest}
+    />
+  );
+};
+
+export default TextArea;
+
+
+
+================================================================================
+LOCATION: components\theme-provider.tsx
+================================================================================
+
+'use client'
+
+import * as React from 'react'
+import { type ThemeProviderProps } from 'next-themes'
+import dynamic from 'next/dynamic'
+
+const NextThemesProvider = dynamic(
+	() => import('next-themes').then((e) => e.ThemeProvider),
+	{
+		ssr: false,
+	}
+)
+
+
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
+	return <NextThemesProvider {...props}>{children}</NextThemesProvider>
+}
 
 
 ================================================================================
@@ -25215,6 +25034,13 @@ export const AppContextProvider: React.FC<any> = ({ children }) => {
 
 
 ================================================================================
+LOCATION: data\blogs\testblog.tsx
+================================================================================
+
+
+
+
+================================================================================
 LOCATION: data\cont.tsx
 ================================================================================
 
@@ -26022,13 +25848,6 @@ export default {
         },
     ]
 }
-
-
-================================================================================
-LOCATION: data\blogs\testblog.tsx
-================================================================================
-
-
 
 
 ================================================================================
@@ -26877,6 +26696,19 @@ export const useAppContext = () => {
 
 
 ================================================================================
+LOCATION: hooks\useIsAdmin.ts
+================================================================================
+
+import { useSession } from "next-auth/react";
+
+export const useIsAdmin = () => {
+  const { data: session } = useSession();
+  return session?.user?.role === "admin";
+};
+
+
+
+================================================================================
 LOCATION: hooks\useMessageNotifications.ts
 ================================================================================
 
@@ -27423,481 +27255,45 @@ export async function trackVisit(): Promise<boolean> {
 
 
 ================================================================================
-LOCATION: prisma\schema.prisma
+LOCATION: middleware.ts
 ================================================================================
 
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
+export { auth as middleware } from "@/auth";
 
-generator client {
-  provider = "prisma-client-js"
-}
+export const runtime = "nodejs";
 
-datasource db {
-  provider     = "mongodb"
-  url          = env("MONGODB_URL")
-  relationMode = "prisma"
-}
 
-model User {
-  id            String            @id @default(auto()) @map("_id") @db.ObjectId
-  name          String?
-  email         String?           @unique
-  emailVerified DateTime?
-  password      String?
-  providerid    String?
-  role          String            @default("customer") //professional admin staff
-  cart          Cart[]
-  //orders   Order[]
-  reviews       Review[]
-  addresses     ShippingAddress[]
-  post          Post[]
-  notification  Notification[]
-  image         String?           @default("https://res.cloudinary.com/dc5khnuiu/image/upload/v1752627019/uxokaq0djttd7gsslwj9.png")
-  contact       String?           @default("xxxx-xxx-xxxx")
-  // visit   Visit[]
-  accounts      Account[]
-  sessions      Session[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  wishlist      Wishlist[]
-  messages      Message[]
-  lunches       Lunch[]
-}
+================================================================================
+LOCATION: next.config.ts
+================================================================================
 
-model Account {
-  id                String @id @default(auto()) @map("_id") @db.ObjectId
-  userId            String @db.ObjectId
-  type              String
-  provider          String
-  providerAccountId String
+import type { NextConfig } from "next";
 
-  refresh_token String?
-  access_token  String?
-  expires_at    Int?
-  token_type    String?
-  scope         String?
-  id_token      String?
-  session_state String?
+const nextConfig: NextConfig = {
+  reactStrictMode: false,
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  turbopack: {
+    root: "./",
+  },
 
-  @@unique([provider, providerAccountId])
-}
+  // async redirects() {
+  //   return [
+  //     {
+  //       source: '/:path*',
+  //       has: [
+  //         {
+  //           type: 'host',
+  //           value: '.*\\.vercel\\.app',
+  //         },
+  //       ],
+  //       destination: 'https://www.succo.vercel.app/:path*',
+  //       permanent: true,
+  //     },
+  //   ]
+  // },
+};
 
-model Session {
-  id           String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId       String   @db.ObjectId
-  expires      DateTime
-  sessionToken String   @unique
-  accessToken  String?  @unique
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  user         User     @relation(fields: [userId], references: [id])
-}
-
-model VerificationRequest {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  identifier String
-  token      String   @unique
-  expires    DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([identifier, token])
-}
-
-model VerificationToken {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  identifier String
-  token      String   @unique
-  expires    DateTime
-
-  @@unique([identifier, token])
-}
-
-model EmailVerificationCode {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  email     String
-  code      String
-  expires   DateTime
-  verified  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email])
-}
-
-// model Visit {
-//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-//   user      User     @relation(fields: [userId], references: [id])
-//   userId    String   @db.ObjectId
-//   createdAt DateTime @default(now())
-// }
-
-model Post {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String?
-  description String?
-  contentUrl  String?
-  author      User     @relation(fields: [authorId], references: [id])
-  authorId    String   @db.ObjectId
-  // product    Product?     @relation(fields: [productId], references: [id])
-  // productId   String?  @db.ObjectId
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-}
-
-model Notification {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  username  String?
-  user      User?    @relation(fields: [userId], references: [id])
-  userId    String?  @db.ObjectId
-  email     String?
-  message   String
-  category  String?
-  to        String?  @default("admin")
-  from      String?  @default("admin")
-  file      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Category {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  name        String    @unique
-  description String?
-  image       String?
-  //slug     String   @unique
-  products    Product[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-}
-
-model Product {
-  id                String           @id @default(auto()) @map("_id") @db.ObjectId
-  name              String
-  description       String?
-  category          Category         @relation(fields: [categoryId], references: [id])
-  categoryId        String           @db.ObjectId
-  activeIngredients String[]
-  scarce            Boolean?
-  for               String[] //patients like oncology/cancer, hiv, etc
-  brand             String?
-  price             Float
-  stock             Stock[] //@relation(fields: [stockId], references: [id])
-  //stockId  String?   @db.ObjectId
-  reviews           Review[]
-  cartItems         CartItem[]
-  Featured          FeaturedProduct?
-  images            String[]
-  //orderItems OrderItem[]
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  wishlist          Wishlist[]
-
-  // add product features like dosage form, strength, manufacturer, etc
-}
-
-//for inputing available product, after sales, deduct the quantity
-//one to one relationship with a product, notice the unique then objectid
-model Stock {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId       String   @db.ObjectId
-  addedQuantity   Int
-  costPerProduct  Float?
-  pricePerProduct Float?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-}
-
-model Cart {
-  id           String     @id @default(auto()) @map("_id") @db.ObjectId
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId       String     @db.ObjectId
-  name         String? // User given name for the cart
-  contact      String? // Contact assigned to the cart
-  products     CartItem[]
-  total        Float
-  deliveryFee  Float      @default(0)
-  payment      Payment?
-  status       String     @default("pending")
-  refund       Refund?
-  type         String     @default("cart") // cart, lunch
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
-  deliveryDate DateTime?
-  lunchId      String?    @db.ObjectId
-  lunch        Lunch?     @relation(fields: [lunchId], references: [id], onDelete: SetNull)
-}
-
-model CartItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  cartId    String   @db.ObjectId
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
-  quantity  Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Payment {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  cartId     String   @unique @db.ObjectId
-  //method must be converted to an enum
-  tx_ref     String?  @unique
-  method     String
-  amount     Float
-  payeeName  String?
-  receiptUrl String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-model Coupon {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  code      String    @unique
-  discount  Float?
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-}
-
-model ShippingAddress {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String   @db.ObjectId
-  address   String?
-  city      String?
-  state     String?
-  zip       String?
-  country   String?
-  phone     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model DeliveryFee {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  country   String?
-  state     String?
-  city      String?
-  region    String?
-  price     Float
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([country, state, city, region])
-}
-
-model Visit {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  fingerprint String // Browser fingerprint from localStorage
-  visitDate   DateTime @default(now())
-  userAgent   String?
-  ipAddress   String?
-  createdAt   DateTime @default(now())
-
-  @@unique([fingerprint, visitDate])
-  @@index([visitDate])
-}
-
-//one to one relation with cart, not d unique to avoid error
-model Refund {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
-  cartId    String   @unique @db.ObjectId
-  amount    Float
-  reason    String?
-  status    String   @default("pending")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Message {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String   @db.ObjectId
-  senderName    String
-  senderEmail   String
-  subject       String
-  message       String
-  adminResponse String?
-  isSeen        Boolean  @default(false)
-  isResolved    Boolean  @default(false)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-}
-
-model FeaturedProduct {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String   @unique @db.ObjectId
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model Review {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String   @db.ObjectId
-  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId  String   @db.ObjectId
-  rating     Int
-  comment    String?
-  isArchived Boolean  @default(false)
-  reply      Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-model Lunch {
-  id         String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId     String   @db.ObjectId
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String?
-  frequency  String   @default("once") // once, daily, weekly, monthly
-  daysOfWeek String[] // ["monday", "wednesday"]
-  timesInDay String[] // ["12:00", "15:00"]
-  startDate  DateTime
-  endDate    DateTime
-  status     String   @default("active") // active, completed, cancelled
-  carts      Cart[]
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-}
-
-model Wishlist {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId    String   @db.ObjectId
-  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  productId String   @db.ObjectId
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, productId])
-}
-
-// model Comment {
-//   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-//   ministryId String?   @db.ObjectId @default("684f74ca135dd6d0efeab37d")
-//   contentId  String   @db.ObjectId
-//   userId     String   @db.ObjectId
-//   username     String
-//   comment  String?
-//   isArchived Boolean  @default(false)
-//   createdAt  DateTime @default(now())
-//   updatedAt  DateTime @updatedAt
-//   reply      Boolean  @default(false)
-//   // replyId   String       @db.ObjectId
-// }
-
-// model Sale {
-//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-//   product   Product  @relation(fields: [productId], references: [id])
-//   productId String
-//   quantity  Int
-//   total     Float
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-// model Order {
-//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-//   user      User     @relation(fields: [userId], references: [id])
-//   userId    String    @db.ObjectId
-//   products  CartItem[]
-//   total     Float
-//   payment Payment?
-//   status    String   @default("pending")
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-// //same as cartitem, a cartitem converted after cart becomes an order
-// model OrderItem {
-//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-//   order     Order    @relation(fields: [orderId], references: [id])
-//   orderId   String    @db.ObjectId
-//   product   Product  @relation(fields: [productId], references: [id])
-//   productId String    @db.ObjectId
-//   quantity  Int
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-// }
-
-//function also performed by review.rating
-// model Like {
-//   id         String   @id @default(auto()) @map("_id") @db.ObjectId
-//   //storeId String?   @db.ObjectId @default("684f74ca135dd6d0efeab37d")
-//   contentId  String   @db.ObjectId
-//   userId     String   @db.ObjectId
-//   // isArchived   Boolean      @default(false)
-//   createdAt  DateTime @default(now())
-//   updatedAt  DateTime @updatedAt
-// }
-
-//  $ prisma [command]
-
-//     Commands
-
-//                 init   Set up Prisma for your app
-//             generate   Generate artifacts (e.g. Prisma Client)
-//                   db   Manage your database schema and lifecycle
-//              migrate   Migrate your database
-//               studio   Browse your data with Prisma Studio
-//             validate   Validate your Prisma schema
-//               format   Format your Prisma schema
-//              version   Displays Prisma version info
-//                debug   Displays Prisma debug info
-//                  mcp   Starts an MCP server to use with AI development tools
-
-//     Flags
-
-//          --preview-feature   Run Preview Prisma commands
-//          --help, -h          Show additional information about a command
-
-// ┌──────────────────────────────────────────────────────────────────────────────────────┐
-// │  Optimize performance through connection pooling and caching with Prisma Accelerate  │
-// │  and capture real-time events from your database with Prisma Pulse.                  │
-// │  Learn more at https://pris.ly/cli/pdp                                               │
-// └──────────────────────────────────────────────────────────────────────────────────────┘
-
-//     Examples
-
-//       Set up a new Prisma project
-//       $ npx prisma init
-
-//       Generate artifacts (e.g. Prisma Client)
-//       $ prisma generate
-
-//       Browse your data
-//       $ prisma studio
-
-//       Create migrations from your Prisma schema, apply them to the database, generate artifacts (e.g. Prisma Client)
-//       $ prisma migrate dev
-
-//       Pull the schema from an existing database, updating the Prisma schema
-//       $ prisma db pull
-
-//       Push the Prisma schema state to the database
-//       $ prisma db push
-
-//       Validate your Prisma schema
-//       $ prisma validate
-
-//       Format your Prisma schema
-//       $ prisma format
-
-//       Display Prisma version info
-//       $ prisma version
-
-//       Display Prisma debug info
-//       $ prisma debug
+export default nextConfig;
 
 
 
@@ -29768,15 +29164,15 @@ import { useEffect, useState } from 'react';
 //   updatedAt?: Date; 
 // }
 
-export default function ProductForm() {
+export default function ProductForm({ initialProduct, hideList = false }: { initialProduct?: any, hideList?: boolean }) {
   const [products, setProducts] = useState<any>([]);
   const [formData, setFormData] = useState<any>({ //useState<Omit<any, 'id' | 'createdAt' | 'updatedAt'>>({
-    name: '',
-    description: '',
-    category: '',
-    categoryId: '',
-    price: 0,
-    images: null,
+    name: initialProduct?.name || '',
+    description: initialProduct?.description || '',
+    categoryId: initialProduct?.categoryId || '',
+    price: initialProduct?.price || 0,
+    costPrice: initialProduct?.costPrice || 0,
+    images: initialProduct?.images || null,
   });
   const [file, setFile] = useState(null);
   const [categories, setCategories] = useState([]);//categories to be mapped to the select input
@@ -29784,12 +29180,26 @@ export default function ProductForm() {
   const [uploadStatus , setUploadStatus] = useState("");
 
   const [productImage, setProductImage] = useState(null);
-  const [editId, setEditId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(initialProduct?.id || null);
 
   useEffect(() => {
-    fetchProducts();
+    if (!hideList) fetchProducts();
     fetchCategories();
   }, []);
+
+  useEffect(() => {
+    if (initialProduct) {
+      setFormData({
+        name: initialProduct.name || '',
+        description: initialProduct.description || '',
+        categoryId: initialProduct.categoryId || '',
+        price: initialProduct.price || 0,
+        costPrice: initialProduct.costPrice || 0,
+        images: initialProduct.images || null,
+      });
+      setEditId(initialProduct.id);
+    }
+  }, [initialProduct]);
 
 
   const fetchProducts = async () => {
@@ -29817,22 +29227,22 @@ export default function ProductForm() {
     setFormData({
       name: '',
       description: '',
-      categoryId: '',
-      category: '',
+      categoryId: categories.length > 0 ? categories[0].id : '',
+      category: categories.length > 0 ? categories[0].name : '',
       price: 0,
+      costPrice: 0,
       images: null,
     });
     setEditId(null);
+    setFile(null);
+    setPreview(null);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    console.log('product', formData, 'file', file);
-
     const pformData = new FormData();
 
-    // ✅ only append file if user selected one
     if (file) {
       pformData.append("file", file);
     }
@@ -29841,10 +29251,8 @@ export default function ProductForm() {
     pformData.append("description", formData.description);
     pformData.append("categoryId", formData.categoryId);
     pformData.append("price", String(formData.price));
-
-    console.log("Submitting product data:", "Edit ID:", editId);
-    for (const [key, value] of pformData.entries()) {
-      console.log(key + ":", value);
+    if (formData.costPrice) {
+      pformData.append("costPrice", String(formData.costPrice));
     }
 
     try {
@@ -29856,13 +29264,12 @@ export default function ProductForm() {
       } else {
         await axios.post(`/api/product`, pformData);
       }
+      resetForm();
+      fetchProducts();
     } catch (error) {
       console.error(error);
       alert("Failed to save product.");
     }
-
-    resetForm();
-    fetchProducts();
   };
 
 
@@ -29898,6 +29305,7 @@ export default function ProductForm() {
       description: product.description ?? '',
       categoryId: product.categoryId ?? '',
       price: product.price ?? 0,
+      costPrice: product.costPrice ?? 0,
       images: product.images ?? [],
     });
   };
@@ -29954,6 +29362,14 @@ export default function ProductForm() {
           type="number"
         />
 
+        <div>Product Cost Price </div>
+        <Input
+          placeholder="Cost price of product"
+          value={formData.costPrice}
+          onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+          type="number"
+        />
+
         <div>Product Image </div>
         {!preview && formData?.images?.length > 0 && (
           <img
@@ -29980,25 +29396,27 @@ export default function ProductForm() {
         {editId && <Button type="button" onClick={resetForm}>Cancel</Button>}
 
 
-        <ul className='w-full'>
-          {products.length > 0 ? (
-            products.map((item , index) => (
-              <li key={index} className="flex flex-col justify-center items-center gap-2 my-2 bg-secondary rounded-md w-full p-2">
-                <div className="flex flex-row gap-2">
-                  <span>{(index + 1)}. Name : </span>
-                  <span>{item.name}</span>
-                </div>
-                <p>Price : {item.price || <em>No price tag</em>}</p>
-                <div className='flex flex-row gap-2 p-1 w-full'>
-                  <Button type='button' onClick={() => handleEdit(item)} className='flex-1'>Edit</Button>
-                  <Button type='button' onClick={() => handleDelete(item)} variant='ghost' className='flex-1 border-2 border-accent'>Delete</Button>
-                </div>
-              </li>
-            ))
-          ) : (
-            <p>No available product.</p>
-          )}
-        </ul>
+        {!hideList && (
+          <ul className='w-full'>
+            {products.length > 0 ? (
+              products.map((item, index) => (
+                <li key={index} className="flex flex-col justify-center items-center gap-2 my-2 bg-secondary rounded-md w-full p-2">
+                  <div className="flex flex-row gap-2">
+                    <span>{(index + 1)}. Name : </span>
+                    <span>{item.name}</span>
+                  </div>
+                  <p>Price : {item.price || <em>No price tag</em>}</p>
+                  <div className='flex flex-row gap-2 p-1 w-full'>
+                    <Button type='button' onClick={() => handleEdit(item)} className='flex-1'>Edit</Button>
+                    <Button type='button' onClick={() => handleDelete(item)} variant='ghost' className='flex-1 border-2 border-accent'>Delete</Button>
+                  </div>
+                </li>
+              ))
+            ) : (
+              <p>No available product.</p>
+            )}
+          </ul>
+        )}
       </form>
     </div>
   );
@@ -31325,6 +30743,709 @@ export default function ShippingAddressForm({ userId, existing, onSaved }: Props
 
 
 ================================================================================
+LOCATION: prisma\schema.prisma
+================================================================================
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "mongodb"
+  url          = env("MONGODB_URL")
+  relationMode = "prisma"
+}
+
+model User {
+  id            String            @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?           @unique
+  emailVerified DateTime?
+  password      String?
+  providerid    String?
+  role          String            @default("customer") //professional admin staff
+  cart          Cart[]
+  //orders   Order[]
+  reviews       Review[]
+  addresses     ShippingAddress[]
+  post          Post[]
+  notification  Notification[]
+  image         String?           @default("https://res.cloudinary.com/dc5khnuiu/image/upload/v1752627019/uxokaq0djttd7gsslwj9.png")
+  contact       String?           @default("xxxx-xxx-xxxx")
+  // visit   Visit[]
+  accounts      Account[]
+  sessions      Session[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  wishlist      Wishlist[]
+  messages      Message[]
+  lunches       Lunch[]
+}
+
+model SiteSettings {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  aboutText String   @default("Welcome to our store. We provide high-quality products to our customers.")
+  addToHome String   @default("Add our app to your home screen for a better experience!")
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+
+  refresh_token String?
+  access_token  String?
+  expires_at    Int?
+  token_type    String?
+  scope         String?
+  id_token      String?
+  session_state String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  expires      DateTime
+  sessionToken String   @unique
+  accessToken  String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+}
+
+model VerificationRequest {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, token])
+}
+
+model VerificationToken {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model EmailVerificationCode {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  code      String
+  expires   DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+// model Visit {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   user      User     @relation(fields: [userId], references: [id])
+//   userId    String   @db.ObjectId
+//   createdAt DateTime @default(now())
+// }
+
+model Post {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String?
+  description String?
+  contentUrl  String?
+  author      User     @relation(fields: [authorId], references: [id])
+  authorId    String   @db.ObjectId
+  // product    Product?     @relation(fields: [productId], references: [id])
+  // productId   String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  username  String?
+  user      User?    @relation(fields: [userId], references: [id])
+  userId    String?  @db.ObjectId
+  email     String?
+  message   String
+  category  String?
+  to        String?  @default("admin")
+  from      String?  @default("admin")
+  file      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Category {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  name        String    @unique
+  description String?
+  image       String?
+  //slug     String   @unique
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id                String           @id @default(auto()) @map("_id") @db.ObjectId
+  name              String
+  description       String?
+  category          Category         @relation(fields: [categoryId], references: [id])
+  categoryId        String           @db.ObjectId
+  activeIngredients String[]
+  scarce            Boolean?
+  for               String[] //patients like oncology/cancer, hiv, etc
+  brand             String?
+  price             Float
+  stock             Stock[] //@relation(fields: [stockId], references: [id])
+  //stockId  String?   @db.ObjectId
+  reviews           Review[]
+  cartItems         CartItem[]
+  Featured          FeaturedProduct?
+  images            String[]
+  costPrice         Float?
+  //orderItems OrderItem[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  wishlist          Wishlist[]
+
+  // add product features like dosage form, strength, manufacturer, etc
+}
+
+//for inputing available product, after sales, deduct the quantity
+//one to one relationship with a product, notice the unique then objectid
+model Stock {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId       String   @db.ObjectId
+  addedQuantity   Int
+  costPerProduct  Float?
+  pricePerProduct Float?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Cart {
+  id           String     @id @default(auto()) @map("_id") @db.ObjectId
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String     @db.ObjectId
+  name         String? // User given name for the cart
+  contact      String? // Contact assigned to the cart
+  products     CartItem[]
+  total        Float
+  deliveryFee  Float      @default(0)
+  payment      Payment?
+  status       String     @default("pending")
+  refund       Refund?
+  type         String     @default("cart") // cart, lunch
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  deliveryDate DateTime?
+  lunchId      String?    @db.ObjectId
+  lunch        Lunch?     @relation(fields: [lunchId], references: [id], onDelete: SetNull)
+}
+
+model CartItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    String   @db.ObjectId
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String   @db.ObjectId
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Payment {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  cart       Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId     String   @unique @db.ObjectId
+  //method must be converted to an enum
+  tx_ref     String?  @unique
+  method     String
+  amount     Float
+  payeeName  String?
+  receiptUrl String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Coupon {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  code      String    @unique
+  discount  Float?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model ShippingAddress {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  address   String?
+  city      String?
+  state     String?
+  zip       String?
+  country   String?
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model DeliveryFee {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  country   String?
+  state     String?
+  city      String?
+  region    String?
+  price     Float
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([country, state, city, region])
+}
+
+model Visit {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  fingerprint String // Browser fingerprint from localStorage
+  visitDate   DateTime @default(now())
+  userAgent   String?
+  ipAddress   String?
+  createdAt   DateTime @default(now())
+
+  @@unique([fingerprint, visitDate])
+  @@index([visitDate])
+}
+
+//one to one relation with cart, not d unique to avoid error
+model Refund {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  cart      Cart     @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cartId    String   @unique @db.ObjectId
+  amount    Float
+  reason    String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Message {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String   @db.ObjectId
+  senderName    String
+  senderEmail   String
+  subject       String
+  message       String
+  adminResponse String?
+  isSeen        Boolean  @default(false)
+  isResolved    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model FeaturedProduct {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String   @unique @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @db.ObjectId
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId  String   @db.ObjectId
+  rating     Int
+  comment    String?
+  isArchived Boolean  @default(false)
+  reply      Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Lunch {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @db.ObjectId
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String?
+  frequency  String   @default("once") // once, daily, weekly, monthly
+  daysOfWeek String[] // ["monday", "wednesday"]
+  timesInDay String[] // ["12:00", "15:00"]
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("active") // active, completed, cancelled
+  carts      Cart[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Wishlist {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @db.ObjectId
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  productId String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, productId])
+}
+
+// model Comment {
+//   id         String   @id @default(auto()) @map("_id") @db.ObjectId
+//   ministryId String?   @db.ObjectId @default("684f74ca135dd6d0efeab37d")
+//   contentId  String   @db.ObjectId
+//   userId     String   @db.ObjectId
+//   username     String
+//   comment  String?
+//   isArchived Boolean  @default(false)
+//   createdAt  DateTime @default(now())
+//   updatedAt  DateTime @updatedAt
+//   reply      Boolean  @default(false)
+//   // replyId   String       @db.ObjectId
+// }
+
+// model Sale {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   product   Product  @relation(fields: [productId], references: [id])
+//   productId String
+//   quantity  Int
+//   total     Float
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+// model Order {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   user      User     @relation(fields: [userId], references: [id])
+//   userId    String    @db.ObjectId
+//   products  CartItem[]
+//   total     Float
+//   payment Payment?
+//   status    String   @default("pending")
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+// //same as cartitem, a cartitem converted after cart becomes an order
+// model OrderItem {
+//   id        String   @id @default(auto()) @map("_id") @db.ObjectId
+//   order     Order    @relation(fields: [orderId], references: [id])
+//   orderId   String    @db.ObjectId
+//   product   Product  @relation(fields: [productId], references: [id])
+//   productId String    @db.ObjectId
+//   quantity  Int
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+
+//function also performed by review.rating
+// model Like {
+//   id         String   @id @default(auto()) @map("_id") @db.ObjectId
+//   //storeId String?   @db.ObjectId @default("684f74ca135dd6d0efeab37d")
+//   contentId  String   @db.ObjectId
+//   userId     String   @db.ObjectId
+//   // isArchived   Boolean      @default(false)
+//   createdAt  DateTime @default(now())
+//   updatedAt  DateTime @updatedAt
+// }
+
+//  $ prisma [command]
+
+//     Commands
+
+//                 init   Set up Prisma for your app
+//             generate   Generate artifacts (e.g. Prisma Client)
+//                   db   Manage your database schema and lifecycle
+//              migrate   Migrate your database
+//               studio   Browse your data with Prisma Studio
+//             validate   Validate your Prisma schema
+//               format   Format your Prisma schema
+//              version   Displays Prisma version info
+//                debug   Displays Prisma debug info
+//                  mcp   Starts an MCP server to use with AI development tools
+
+//     Flags
+
+//          --preview-feature   Run Preview Prisma commands
+//          --help, -h          Show additional information about a command
+
+// ┌──────────────────────────────────────────────────────────────────────────────────────┐
+// │  Optimize performance through connection pooling and caching with Prisma Accelerate  │
+// │  and capture real-time events from your database with Prisma Pulse.                  │
+// │  Learn more at https://pris.ly/cli/pdp                                               │
+// └──────────────────────────────────────────────────────────────────────────────────────┘
+
+//     Examples
+
+//       Set up a new Prisma project
+//       $ npx prisma init
+
+//       Generate artifacts (e.g. Prisma Client)
+//       $ prisma generate
+
+//       Browse your data
+//       $ prisma studio
+
+//       Create migrations from your Prisma schema, apply them to the database, generate artifacts (e.g. Prisma Client)
+//       $ prisma migrate dev
+
+//       Pull the schema from an existing database, updating the Prisma schema
+//       $ prisma db pull
+
+//       Push the Prisma schema state to the database
+//       $ prisma db push
+
+//       Validate your Prisma schema
+//       $ prisma validate
+
+//       Format your Prisma schema
+//       $ prisma format
+
+//       Display Prisma version info
+//       $ prisma version
+
+//       Display Prisma debug info
+//       $ prisma debug
+
+
+
+================================================================================
+LOCATION: server\action\getSession.ts
+================================================================================
+
+"use server"
+import { cache } from "react";
+import { auth } from "../auth";
+
+
+export const getSession = cache(async () => {
+    const session = await auth()
+    return session
+})
+
+
+================================================================================
+LOCATION: server\action\login.ts
+================================================================================
+
+"use server"
+
+import { signIn } from "../auth.ts";
+
+const login = async ( formData : FormData) => {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    console.log(email)
+
+    if (!email && !password) {
+         console.log("invalid account")
+         return
+    }
+
+    try{
+        await signIn("credentials", {
+            // redirect: false,
+            // callbackUrl: "/account",
+            email,
+            password,
+        })
+    } catch (error) {
+        console.log("credentials sign in error")
+    }
+
+};
+
+export {login}
+
+
+================================================================================
+LOCATION: server\action\logout.ts
+================================================================================
+
+
+
+
+================================================================================
+LOCATION: server\action\postStockAction.ts
+================================================================================
+
+// import mongodb from "../db/mongodb/index.js"
+// import { uploadimg } from "../utils/multersetup.js";
+// import cloud from "../config/cloudinary.js"
+
+
+
+
+// router.post("/upload", uploadimg.single("file"), (req, res)=>{
+//     if (!req.file) {
+//         return res.status(400).json({ message: 'No file uploaded' });
+//       }
+//     const { stock_name, cost, price, quantity, category, message } = req.body;
+    
+//     if (!stock_name && !cost && !price && !quantity && !category && !message) {
+//         return res.status(400).json({ message: 'incomplete fields inputed' });
+//       }
+
+//     const postStock =async ()=>{
+//         const uploaded =await cloud.uploadCloudinary(req.file.buffer, "/succo/img/stocks")
+            
+//         //const public_id = uploaded.public_id //path to image without extension or format
+//         const url = uploaded.url
+//         //post the form data and the image url to the mongodb database
+
+//         const newStock = await mongodb.Stock.create({
+//             name: stock_name,
+//             price: Number(price),
+//             description: message,
+//             category: category,
+//             img: url,
+//             qty: Number(quantity),
+//             cost: Number(cost),
+//         })
+//     }
+//     postStock()
+// })
+
+// export default router
+
+
+================================================================================
+LOCATION: server\action\signup.ts
+================================================================================
+
+"use server"
+
+import User from "../db/mongodb/models/users.ts";
+import connect from "../config/mongodb.ts";
+import { hashSync } from "bcrypt-edge";
+import { redirect } from "next/navigation";
+
+
+const register = async ( formData : FormData) => {
+    const userName = formData.get("userName") as string;
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+
+    console.log({userName, email, password})
+
+    let role = "user"
+    if (!userName && !email && !password) {
+         console.log("account already exist")
+         return
+    }
+
+    const postUser =async ()=>{
+        await connect();
+
+        const existingUser = await User.findOne({email})
+
+        if (existingUser) {console.log("user already exist"); redirect("account") ; return; } //throw new Error ("user already exists")
+        if ( email == "adepojuololade2020@gmail.com" || email == "adepojuololade2020@gmail.com"){
+            role = "admin"
+        } 
+        if ( email == "staff@gmail.com" || email == "rep@gmail.com"){
+            role = "staff"
+        } 
+        const hashedPassword = await hashSync(password, 10)
+
+        const user = await User.create({
+            userName: userName,
+            email: email,
+            password: hashedPassword,
+            role: role,
+        })
+    }
+    postUser()
+
+};
+
+export {register}
+
+
+================================================================================
+LOCATION: server\action\siteSettings.ts
+================================================================================
+
+"use server"
+
+import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
+
+export async function getSiteSettings() {
+  try {
+    let settings = await prisma.siteSettings.findFirst();
+    if (!settings) {
+      settings = await prisma.siteSettings.create({
+        data: {
+          aboutText: "Welcome to our store. We provide high-quality products to our customers.",
+          addToHome: "Add our app to your home screen for a better experience!",
+        },
+      });
+    }
+    return settings;
+  } catch (error) {
+    console.error("Failed to get site settings:", error);
+    return null;
+  }
+}
+
+export async function updateSiteSettings(data: { aboutText?: string; addToHome?: string }) {
+  try {
+    const settings = await prisma.siteSettings.findFirst();
+    if (settings) {
+      await prisma.siteSettings.update({
+        where: { id: settings.id },
+        data,
+      });
+    } else {
+      await prisma.siteSettings.create({
+        data: {
+          aboutText: data.aboutText || "Welcome to our store. We provide high-quality products to our customers.",
+          addToHome: data.addToHome || "Add our app to your home screen for a better experience!",
+        },
+      });
+    }
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to update site settings:", error);
+    return { success: false, error: "Failed to update settings" };
+  }
+}
+
+
+
+================================================================================
+LOCATION: server\action\stock.ts
+================================================================================
+
+"use server"
+
+
+
+
+================================================================================
 LOCATION: server\auth.ts
 ================================================================================
 
@@ -31599,169 +31720,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
 // export default authConfig
 
-
-
-
-
-================================================================================
-LOCATION: server\action\getSession.ts
-================================================================================
-
-"use server"
-import { cache } from "react";
-import { auth } from "../auth";
-
-
-export const getSession = cache(async () => {
-    const session = await auth()
-    return session
-})
-
-
-================================================================================
-LOCATION: server\action\login.ts
-================================================================================
-
-"use server"
-
-import { signIn } from "../auth.ts";
-
-const login = async ( formData : FormData) => {
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    console.log(email)
-
-    if (!email && !password) {
-         console.log("invalid account")
-         return
-    }
-
-    try{
-        await signIn("credentials", {
-            // redirect: false,
-            // callbackUrl: "/account",
-            email,
-            password,
-        })
-    } catch (error) {
-        console.log("credentials sign in error")
-    }
-
-};
-
-export {login}
-
-
-================================================================================
-LOCATION: server\action\logout.ts
-================================================================================
-
-
-
-
-================================================================================
-LOCATION: server\action\postStockAction.ts
-================================================================================
-
-// import mongodb from "../db/mongodb/index.js"
-// import { uploadimg } from "../utils/multersetup.js";
-// import cloud from "../config/cloudinary.js"
-
-
-
-
-// router.post("/upload", uploadimg.single("file"), (req, res)=>{
-//     if (!req.file) {
-//         return res.status(400).json({ message: 'No file uploaded' });
-//       }
-//     const { stock_name, cost, price, quantity, category, message } = req.body;
-    
-//     if (!stock_name && !cost && !price && !quantity && !category && !message) {
-//         return res.status(400).json({ message: 'incomplete fields inputed' });
-//       }
-
-//     const postStock =async ()=>{
-//         const uploaded =await cloud.uploadCloudinary(req.file.buffer, "/succo/img/stocks")
-            
-//         //const public_id = uploaded.public_id //path to image without extension or format
-//         const url = uploaded.url
-//         //post the form data and the image url to the mongodb database
-
-//         const newStock = await mongodb.Stock.create({
-//             name: stock_name,
-//             price: Number(price),
-//             description: message,
-//             category: category,
-//             img: url,
-//             qty: Number(quantity),
-//             cost: Number(cost),
-//         })
-//     }
-//     postStock()
-// })
-
-// export default router
-
-
-================================================================================
-LOCATION: server\action\signup.ts
-================================================================================
-
-"use server"
-
-import User from "../db/mongodb/models/users.ts";
-import connect from "../config/mongodb.ts";
-import { hashSync } from "bcrypt-edge";
-import { redirect } from "next/navigation";
-
-
-const register = async ( formData : FormData) => {
-    const userName = formData.get("userName") as string;
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    console.log({userName, email, password})
-
-    let role = "user"
-    if (!userName && !email && !password) {
-         console.log("account already exist")
-         return
-    }
-
-    const postUser =async ()=>{
-        await connect();
-
-        const existingUser = await User.findOne({email})
-
-        if (existingUser) {console.log("user already exist"); redirect("account") ; return; } //throw new Error ("user already exists")
-        if ( email == "adepojuololade2020@gmail.com" || email == "adepojuololade2020@gmail.com"){
-            role = "admin"
-        } 
-        if ( email == "staff@gmail.com" || email == "rep@gmail.com"){
-            role = "staff"
-        } 
-        const hashedPassword = await hashSync(password, 10)
-
-        const user = await User.create({
-            userName: userName,
-            email: email,
-            password: hashedPassword,
-            role: role,
-        })
-    }
-    postUser()
-
-};
-
-export {register}
-
-
-================================================================================
-LOCATION: server\action\stock.ts
-================================================================================
-
-"use server"
 
 
 
@@ -35636,6 +35594,36 @@ export default {
 
 
 ================================================================================
+LOCATION: session.ts
+================================================================================
+
+'use server'
+import { auth } from "./auth";
+import type { Session } from "next-auth";
+
+
+export const usersession = async () => {
+    const session = await auth();
+    // console.log("session from login component",session)
+    if (session?.user) {
+      return session;
+    }
+  }
+
+
+
+
+//   session from login component {
+//   user: {
+//     name: 'Adepoju Ololade',
+//     email: 'adepojuololade2020@gmail.com',
+//     image: 'https://lh3.googleusercontent.com/a/ACg8ocLdrFmljf-SPXpYAl7HcdIPIVgBam0jRZ5YkySzCZW8zI7oIik2=s96-c'
+//   },
+//   expires: '2025-12-06T18:59:49.210Z'
+// }
+
+
+================================================================================
 LOCATION: store\auth-slice.ts
 ================================================================================
 
@@ -35796,6 +35784,528 @@ export function Providers({ children } : { children: React.ReactNode }) {
 
 
 ================================================================================
+LOCATION: tailwind.config.ts
+================================================================================
+
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+    darkMode: ["class"],
+    content: [
+    "./pages/**/*.{js,ts,jsx,tsx,mdx}",
+    "./components/**/*.{js,ts,jsx,tsx,mdx}",
+    "./app/**/*.{js,ts,jsx,tsx,mdx}",
+  ],
+  theme: {
+  	container: {
+  		center: true,
+  		padding: '2rem',
+  		screens: {
+  			'2xl': '1400px'
+  		}
+  	},
+  	screens: {
+  		sm: '640px',
+  		md: '768px',
+  		lg: '960px',
+  		xl: '1240px'
+  	},
+  	extend: {
+  		colors: {
+  			background: 'hsl(var(--background))',
+  			foreground: 'hsl(var(--foreground))',
+  			card: {
+  				DEFAULT: 'hsl(var(--card))',
+  				foreground: 'hsl(var(--card-foreground))'
+  			},
+  			popover: {
+  				DEFAULT: 'hsl(var(--popover))',
+  				foreground: 'hsl(var(--popover-foreground))'
+  			},
+  			primary: {
+  				DEFAULT: 'hsl(var(--primary))',
+  				foreground: 'hsl(var(--primary-foreground))'
+  			},
+  			secondary: {
+  				DEFAULT: 'hsl(var(--secondary))',
+  				foreground: 'hsl(var(--secondary-foreground))'
+  			},
+  			muted: {
+  				DEFAULT: 'hsl(var(--muted))',
+  				foreground: 'hsl(var(--muted-foreground))'
+  			},
+  			accent: {
+  				DEFAULT: 'hsl(var(--accent))',
+  				foreground: 'hsl(var(--accent-foreground))',
+  				secondary: 'hsl(var(--accent-secondary))'
+  			},
+  			destructive: {
+  				DEFAULT: 'hsl(var(--destructive))',
+  				foreground: 'hsl(var(--destructive-foreground))'
+  			},
+  			border: 'hsl(var(--border))',
+  			input: 'hsl(var(--input))',
+  			ring: 'hsl(var(--ring))',
+  			chart: {
+  				'1': 'hsl(var(--chart-1))',
+  				'2': 'hsl(var(--chart-2))',
+  				'3': 'hsl(var(--chart-3))',
+  				'4': 'hsl(var(--chart-4))',
+  				'5': 'hsl(var(--chart-5))'
+  			},
+  			sidebar: {
+  				DEFAULT: 'hsl(var(--sidebar-background))',
+  				foreground: 'hsl(var(--sidebar-foreground))',
+  				primary: 'hsl(var(--sidebar-primary))',
+  				'primary-foreground': 'hsl(var(--sidebar-primary-foreground))',
+  				accent: 'hsl(var(--sidebar-accent))',
+  				'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
+  				border: 'hsl(var(--sidebar-border))',
+  				ring: 'hsl(var(--sidebar-ring))'
+  			}
+  		},
+  		fontFamily: {
+  			'dance': [
+  				'dance'
+  			],
+  			'roboto_mono': [
+  				'roboto_mono'
+  			],
+  			'roboto': [
+  				'roboto'
+  			]
+  		},
+  		borderRadius: {
+  			lg: 'var(--radius)',
+  			md: 'calc(var(--radius) - 2px)',
+  			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		keyframes: {
+  			'accordion-down': {
+  				from: {
+  					height: '0'
+  				},
+  				to: {
+  					height: 'var(--radix-accordion-content-height)'
+  				}
+  			},
+  			'accordion-up': {
+  				from: {
+  					height: 'var(--radix-accordion-content-height)'
+  				},
+  				to: {
+  					height: '0'
+  				}
+  			}
+  		},
+  		animation: {
+  			'accordion-down': 'accordion-down 0.2s ease-out',
+  			'accordion-up': 'accordion-up 0.2s ease-out'
+  		}
+  	}
+  },
+  plugins: [require("tailwindcss-animate")],
+};
+export default config;
+
+
+
+================================================================================
+LOCATION: textctrl.tsx
+================================================================================
+
+
+import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+
+export const TextAnimations = () => {
+  const texts = ['TextAnimations', 'Text 2', 'TextAnimations', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+        initial={{ opacity: 0 }}
+        animate={{
+          opacity: 1,
+          transition: {
+            duration: 2.0,
+            delay: 0.5,
+            /*repeat: Infinity,*/
+          },
+        }}
+        className="text-lg font-bold text-gray-800"
+      >
+        {texts[currentIndex]}
+      </motion.div>
+    )
+  }
+  
+
+  return (
+    <div className="container mx-auto p-4">
+        <Temp />
+    </div>
+  );
+};
+
+
+
+export const SlideInText = () => {
+  const texts = ['SlideInText', 'Text 2', 'SlideInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{
+            x: '0%',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+  
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const ScaleInText = () => {
+  const texts = ['ScaleInText', 'Text 2', 'ScaleInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{
+            scale: 1,
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const RotateInText = () => {
+  const texts = ['RotateInText', 'Text 2', 'RotateInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ rotate: '0deg' }}
+          animate={{
+            rotate: '360deg',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const FlyInText = () => {
+  const texts = ['FlyInText', 'Text 2', 'FlyInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{
+            x: '0%',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+export const TypewriterText = () => {
+  const texts = ['TypewriterText', 'Text 2', 'TypewriterText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ width: '0%' }}
+          animate={{
+            width: '100%',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const SlideUpText = () => {
+  const texts = ['SlideUpText', 'Text 2', 'SlideUpText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ y: '100%' }}
+          animate={{
+            y: '0%',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const BounceInText = () => {
+  const texts = ['BounceInText', 'Text 2', 'BounceInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{
+            scale: 1,
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const ZoomInText = () => {
+  const texts = ['ZoomInText', 'Text 2', 'ZoomInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{
+            scale: 1,
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+export const FlipInText = () => {
+  const texts = ['FlipInText', 'Text 2', 'FlipInText', 'Text 4'];
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  useEffect(()=>{
+    const interval = setInterval(()=>{
+        setCurrentIndex((prevIndex)=>(prevIndex+1)%texts.length)
+    },6000)
+    return()=>clearInterval(interval)
+  },[currentIndex])
+
+  const Temp = () => {
+    return (
+        <motion.div
+          initial={{ rotateY: '180deg' }}
+          animate={{
+            rotateY: '0deg',
+            transition: {
+              duration: 4.0,
+              delay: 0.5,
+            },
+          }}
+          className="text-lg font-bold text-gray-800"
+        >
+          {texts[currentIndex]}
+        </motion.div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <Temp />
+    </div>
+  );
+};
+
+
+
+
+
+
+
+================================================================================
 LOCATION: types\commentType.ts
 ================================================================================
 
@@ -35946,5 +36456,5 @@ export const normalizeDateTime = (dateTime?: string): string => {
 
 
 ================================================================================
-TOTAL FILES CONSOLIDATED: 315
+TOTAL FILES CONSOLIDATED: 320
 ================================================================================
