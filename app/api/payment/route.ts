@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { PrismaClient } from "@prisma/client";
 import axios from "axios";
-import { sendOrderNotification } from "@/lib/nodemailer";
+import { sendOrderNotification, sendPaymentConfirmationEmail } from "@/lib/nodemailer";
 
 const prisma = new PrismaClient();
 
@@ -40,24 +40,54 @@ export async function POST(req: NextRequest) {
 
       if (data.status === "successful") {
         // Find payment by tx_ref
-        const payment = await prisma.payment.findUnique({ where: { tx_ref } });
+        const payment = await prisma.payment.findUnique({ 
+          where: { tx_ref },
+          include: { 
+            cart: {
+              include: {
+                user: true,
+                products: {
+                  include: { product: true }
+                }
+              }
+            }
+          }
+        });
 
-        if (payment) {
-          // Mark cart as paid
-          await prisma.cart.update({
-            where: { id: payment.cartId },
-            data: { status: "paid" },
-          });
-          // Send order notification
-          // Sending to a test email as requested
-          await sendOrderNotification(process.env.ORDER_RECEIVER_EMAIL, {
-            tx_ref,
-            amount: data.amount,
-          });
-          await sendOrderNotification('adepojuololade2020@gmail.com', {
-            tx_ref,
-            amount: data.amount,
-          });
+        if (payment && payment.cart) {
+          const paidAmount = data.amount;
+          const expectedAmount = payment.amount;
+
+          if (paidAmount >= expectedAmount) {
+            // Mark cart as paid
+            await prisma.cart.update({
+              where: { id: payment.cartId },
+              data: { status: "paid" },
+            });
+
+            // Send confirmation email to user
+            if (payment.cart.user?.email) {
+                await sendPaymentConfirmationEmail(payment.cart.user.email, {
+                    customerName: payment.cart.user.name || "Customer",
+                    contact: payment.cart.user.contact || "N/A",
+                    address: "N/A", 
+                    products: payment.cart.products,
+                    total: payment.cart.total,
+                    deliveryFee: payment.cart.deliveryFee || 0,
+                    orderId: payment.cart.id
+                });
+            }
+
+            // Notify Admin
+            await sendOrderNotification(process.env.ORDER_RECEIVER_EMAIL ?? 'adepojuololade2020@gmail.com', {
+                tx_ref,
+                amount: data.amount,
+                status: "paid"
+            });
+          } else {
+            console.error(`Amount mismatch in Succo: Paid ₦${paidAmount}, Expected ₦${expectedAmount}`);
+            return NextResponse.json({ success: false, message: "Amount mismatch detected" });
+          }
         }
 
         return NextResponse.json({ success: true, message: "Payment confirmed" });
